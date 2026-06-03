@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   Activity,
@@ -7,6 +7,8 @@ import {
   Crosshair,
   FileSpreadsheet,
   FolderOpen,
+  Maximize2,
+  Minus,
   Plus,
   Radar,
   RotateCcw,
@@ -16,6 +18,7 @@ import {
   Terminal,
   UploadCloud,
   Users,
+  X,
   Zap
 } from "lucide-react";
 import { attackModes, distanceBands, skillLabels, statLabels } from "./data/rules.js";
@@ -57,6 +60,7 @@ function blankSources(cards) {
 }
 
 function App() {
+  const isDesktopApp = Boolean(window.electronWindow);
   const [cards, setCards] = useState(sampleCards);
   const [sources, setSources] = useState(() => blankSources(sampleCards));
   const [config, setConfig] = useState(initialConfig);
@@ -231,90 +235,135 @@ function App() {
   }
 
   return (
-    <main className="app-shell">
-      <header className="command-header">
-        <div className="brand-lockup">
-          <span className="brand-mark">
-            <Terminal size={18} />
-          </span>
-          <div>
-            <h1>赛博朋克 RED 多人战斗结算台</h1>
-            <p>8+ 自动卡作战名册，任意选择攻击方与目标，结算后按键回填目标卡并支持撤回。</p>
+    <>
+      {isDesktopApp && <WindowTitleBar />}
+      <main className={`app-shell ${isDesktopApp ? "with-titlebar" : ""}`}>
+        <header className="command-header">
+          <div className="brand-lockup">
+            <span className="brand-mark">
+              <Terminal size={18} />
+            </span>
+            <div>
+              <h1>赛博朋克 RED 多人战斗结算台</h1>
+              <p>8+ 自动卡作战名册，任意选择攻击方与目标，结算后按键回填目标卡并支持撤回。</p>
+            </div>
           </div>
-        </div>
-        <div className="header-metrics">
-          <Metric icon={<Users />} label="战斗人员" value={`${combatants.length} 张`} />
-          <Metric icon={<Crosshair />} label="攻击方" value={attacker.name || slotLabel(config.attacker)} />
-          <Metric icon={<Shield />} label="目标" value={defender.name || slotLabel(config.defender)} />
-          <Metric icon={<Zap />} label="态势" value={threat.label} tone={threat.tone} />
-        </div>
-      </header>
+          <div className="header-metrics">
+            <Metric icon={<Users />} label="战斗人员" value={`${combatants.length} 张`} />
+            <Metric icon={<Crosshair />} label="攻击方" value={attacker.name || slotLabel(config.attacker)} />
+            <Metric icon={<Shield />} label="目标" value={defender.name || slotLabel(config.defender)} />
+            <Metric icon={<Zap />} label="态势" value={threat.label} tone={threat.tone} />
+          </div>
+        </header>
 
-      <section className="battle-grid">
-        <RosterPanel
-          combatants={combatants}
-          sources={sources}
-          config={config}
-          selectedCardId={selectedCardId}
-          dragSide={dragSide}
-          onDragSide={setDragSide}
-          onSelect={setSelectedCardId}
-          onSetAttacker={setAttacker}
-          onSetDefender={setDefender}
-          onDropFile={importFile}
-          onOpenPicker={openWithPicker}
-          onAdd={addCombatant}
-        />
-
-        <section className="center-stack">
-          <TacticalBoard
+        <section className="battle-grid">
+          <RosterPanel
             combatants={combatants}
-            cards={cards}
+            sources={sources}
             config={config}
-            attacker={attacker}
-            defender={defender}
-            threat={threat}
+            selectedCardId={selectedCardId}
+            dragSide={dragSide}
+            onDragSide={setDragSide}
+            onSelect={setSelectedCardId}
             onSetAttacker={setAttacker}
             onSetDefender={setDefender}
-            onSwap={swapSides}
-          />
-          <CharacterPanel
-            id={selectedCardId}
-            card={selectedCard}
-            source={selectedSource}
-            active={config.attacker === selectedCardId ? "attacker" : config.defender === selectedCardId ? "defender" : ""}
             onDropFile={importFile}
             onOpenPicker={openWithPicker}
-            onSaveDirect={saveDirect}
-            onChange={patchCard}
+            onAdd={addCombatant}
           />
+
+          <section className="center-stack">
+            <TacticalBoard
+              combatants={combatants}
+              cards={cards}
+              config={config}
+              attacker={attacker}
+              defender={defender}
+              threat={threat}
+              onSetAttacker={setAttacker}
+              onSetDefender={setDefender}
+              onSwap={swapSides}
+            />
+            <CharacterPanel
+              id={selectedCardId}
+              card={selectedCard}
+              source={selectedSource}
+              active={config.attacker === selectedCardId ? "attacker" : config.defender === selectedCardId ? "defender" : ""}
+              onDropFile={importFile}
+              onOpenPicker={openWithPicker}
+              onSaveDirect={saveDirect}
+              onChange={patchCard}
+            />
+          </section>
+
+          <aside className="side-stack">
+            <CombatConsole
+              combatants={combatants}
+              config={config}
+              setConfig={setConfig}
+              mode={mode}
+              onResolve={() => resolve(false)}
+              onBaseOnly={() => resolve(true)}
+              onFillBack={fillBackResult}
+              onUndo={undoDamage}
+              onSwap={swapSides}
+              onReset={resetDemo}
+            />
+            <ResultPanel result={result} config={config} onFillBack={fillBackResult} />
+            <LogPanel log={log} onClear={() => setLog([])} />
+          </aside>
         </section>
 
-        <aside className="side-stack">
-          <CombatConsole
-            combatants={combatants}
-            config={config}
-            setConfig={setConfig}
-            mode={mode}
-            onResolve={() => resolve(false)}
-            onBaseOnly={() => resolve(true)}
-            onFillBack={fillBackResult}
-            onUndo={undoDamage}
-            onSwap={swapSides}
-            onReset={resetDemo}
-          />
-          <ResultPanel result={result} config={config} onFillBack={fillBackResult} />
-          <LogPanel log={log} onClear={() => setLog([])} />
-        </aside>
-      </section>
+        {toast && (
+          <button className="toast" type="button" onClick={() => setToast("")}>
+            <AlertTriangle size={16} />
+            {toast}
+          </button>
+        )}
+      </main>
+    </>
+  );
+}
 
-      {toast && (
-        <button className="toast" type="button" onClick={() => setToast("")}>
-          <AlertTriangle size={16} />
-          {toast}
+function WindowTitleBar() {
+  const [maximized, setMaximized] = useState(false);
+
+  useEffect(() => {
+    window.electronWindow?.isMaximized?.().then(setMaximized).catch(() => {});
+  }, []);
+
+  async function toggleMaximize() {
+    const next = await window.electronWindow.toggleMaximize();
+    setMaximized(next);
+  }
+
+  return (
+    <header className="window-titlebar">
+      <div className="titlebar-grip">
+        <span className="titlebar-sigil">
+          <Terminal size={15} />
+        </span>
+        <div>
+          <strong>Night City Combat Console</strong>
+          <small>Cyberpunk RED / Multiplayer Card Ops</small>
+        </div>
+      </div>
+      <div className="titlebar-status">
+        <span>LOCAL FILE BRIDGE</span>
+        <span>READY</span>
+      </div>
+      <div className="window-controls">
+        <button type="button" className="window-button" onClick={() => window.electronWindow.minimize()} title="最小化">
+          <Minus size={15} />
         </button>
-      )}
-    </main>
+        <button type="button" className="window-button" onClick={toggleMaximize} title={maximized ? "还原" : "最大化"}>
+          <Maximize2 size={14} />
+        </button>
+        <button type="button" className="window-button close" onClick={() => window.electronWindow.close()} title="关闭">
+          <X size={16} />
+        </button>
+      </div>
+    </header>
   );
 }
 

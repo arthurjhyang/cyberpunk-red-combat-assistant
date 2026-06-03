@@ -6,9 +6,10 @@ function createWindow() {
   const window = new BrowserWindow({
     width: 1440,
     height: 920,
-    minWidth: 1100,
-    minHeight: 720,
+    minWidth: 720,
+    minHeight: 560,
     title: "赛博朋克 RED 多人战斗结算台",
+    frame: false,
     backgroundColor: "#07090f",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
@@ -60,4 +61,27 @@ ipcMain.handle("card:saveWorkbook", async (_event, payload) => {
   }
   await fs.writeFile(payload.filePath, Buffer.from(payload.base64, "base64"));
   return { ok: true };
+});
+
+ipcMain.handle("window:minimize", event => {
+  BrowserWindow.fromWebContents(event.sender)?.minimize();
+});
+
+ipcMain.handle("window:toggleMaximize", event => {
+  const window = BrowserWindow.fromWebContents(event.sender);
+  if (!window) return false;
+  if (window.isMaximized()) {
+    window.unmaximize();
+  } else {
+    window.maximize();
+  }
+  return window.isMaximized();
+});
+
+ipcMain.handle("window:isMaximized", event => {
+  return Boolean(BrowserWindow.fromWebContents(event.sender)?.isMaximized());
+});
+
+ipcMain.handle("window:close", event => {
+  BrowserWindow.fromWebContents(event.sender)?.close();
 });
