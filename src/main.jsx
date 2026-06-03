@@ -7,16 +7,19 @@ import {
   Crosshair,
   FileSpreadsheet,
   FolderOpen,
+  Plus,
+  Radar,
   RotateCcw,
   Save,
   Shield,
   Swords,
   Terminal,
   UploadCloud,
+  Users,
   Zap
 } from "lucide-react";
 import { attackModes, distanceBands, skillLabels, statLabels } from "./data/rules.js";
-import { sampleCards } from "./data/sampleCards.js";
+import { createBlankCard, sampleCards } from "./data/sampleCards.js";
 import {
   applyDamage,
   baseFor,
@@ -35,8 +38,8 @@ import {
 import "./styles.css";
 
 const initialConfig = {
-  attacker: "a",
-  defender: "b",
+  attacker: "slot-1",
+  defender: "slot-2",
   attackType: "ranged",
   weaponId: "mediumPistol",
   distanceBand: 0,
@@ -49,56 +52,68 @@ const initialConfig = {
   autoRollDamage: true
 };
 
+function blankSources(cards) {
+  return Object.fromEntries(Object.keys(cards).map(id => [id, null]));
+}
+
 function App() {
   const [cards, setCards] = useState(sampleCards);
-  const [sources, setSources] = useState({ a: null, b: null });
+  const [sources, setSources] = useState(() => blankSources(sampleCards));
   const [config, setConfig] = useState(initialConfig);
+  const [selectedCardId, setSelectedCardId] = useState(initialConfig.attacker);
   const [result, setResult] = useState(null);
   const [log, setLog] = useState([]);
   const [toast, setToast] = useState("");
   const [dragSide, setDragSide] = useState(null);
   const [lastSnapshot, setLastSnapshot] = useState(null);
 
+  const combatants = useMemo(() => Object.entries(cards).map(([id, card], index) => ({ id, card, index })), [cards]);
   const mode = selectedMode(config);
   const attacker = cards[config.attacker];
   const defender = cards[config.defender];
+  const selectedCard = cards[selectedCardId] || attacker;
+  const selectedSource = sources[selectedCardId] || null;
+  const threat = useMemo(() => estimateThreat(cards, config), [cards, config]);
 
-  function patchCard(side, patch) {
+  function patchCard(id, patch) {
     setCards(prev => {
+      const current = prev[id];
       const nextCard = {
-        ...prev[side],
+        ...current,
         ...patch,
-        skills: { ...prev[side].skills, ...(patch.skills || {}) }
+        skills: { ...current.skills, ...(patch.skills || {}) }
       };
-      const next = { ...prev, [side]: nextCard };
+      const next = { ...prev, [id]: nextCard };
       setSources(sourcePrev => ({
         ...sourcePrev,
-        [side]: updateWorkbookFromCard(sourcePrev[side], nextCard) || sourcePrev[side]
+        [id]: updateWorkbookFromCard(sourcePrev[id], nextCard) || sourcePrev[id]
       }));
       return next;
     });
   }
 
-  async function importFile(side, file, handle = null) {
+  async function importFile(id, file, handle = null) {
     if (!file) return;
     try {
       const source = await readWorkbookFile(file, handle);
-      setCards(prev => ({ ...prev, [side]: source.card }));
-      setSources(prev => ({ ...prev, [side]: source }));
-      pushLog(`导入 ${side.toUpperCase()} 卡：${source.card.name}（${file.name}）`);
-      setToast(`${side.toUpperCase()} 卡已读取：${source.card.name}`);
+      setCards(prev => ({ ...prev, [id]: source.card }));
+      setSources(prev => ({ ...prev, [id]: source }));
+      setSelectedCardId(id);
+      pushLog(`导入 ${slotLabel(id)}：${source.card.name}（${file.name}）`);
+      setToast(`${slotLabel(id)} 已读取：${source.card.name}`);
     } catch (error) {
       setToast(error.message);
     }
   }
 
-  async function openWithPicker(side) {
+  async function openWithPicker(id) {
     try {
       const source = await openWorkbookWithPicker();
-      setCards(prev => ({ ...prev, [side]: source.card }));
-      setSources(prev => ({ ...prev, [side]: source }));
-      pushLog(`授权打开 ${side.toUpperCase()} 卡：${source.card.name}`);
-      setToast(`${side.toUpperCase()} 卡已授权，可直接保存回原文件`);
+      setCards(prev => ({ ...prev, [id]: source.card }));
+      setSources(prev => ({ ...prev, [id]: source }));
+      setSelectedCardId(id);
+      pushLog(`授权打开 ${slotLabel(id)}：${source.card.name}`);
+      setToast(`${slotLabel(id)} 已授权，可直接保存回原文件`);
     } catch (error) {
       setToast(error.message);
     }
@@ -106,11 +121,11 @@ function App() {
 
   function resolve(baseOnly = false) {
     if (config.attacker === config.defender) {
-      setToast("攻击方和防守方不能是同一张卡。");
+      setToast("攻击方和防守方不能是同一个战斗人员。");
       return;
     }
     if (baseOnly) {
-      setResult({ baseOnly: true, mode, attacker, defender, config });
+      setResult({ baseOnly: true, mode, attacker, defender, config: { ...config } });
       return;
     }
     const resolved = resolveCombat(cards, config);
@@ -138,16 +153,17 @@ function App() {
       setToast("这次结算没有自动伤害可回填。");
       return;
     }
-    const targetSide = result.config.defender;
-    const before = cards[targetSide];
+    const targetId = result.config.defender;
+    const before = cards[targetId];
     const applied = applyDamage(before, result.damage.total, result.attack, result.config.targetPart, result.damage.crit);
     const nextTarget = applied.card;
-    setLastSnapshot({ side: targetSide, card: before, source: sources[targetSide], result });
-    setCards(prev => ({ ...prev, [targetSide]: nextTarget }));
+    setLastSnapshot({ id: targetId, card: before, source: sources[targetId], result });
+    setCards(prev => ({ ...prev, [targetId]: nextTarget }));
     setSources(prev => ({
       ...prev,
-      [targetSide]: updateWorkbookFromCard(prev[targetSide], nextTarget) || prev[targetSide]
+      [targetId]: updateWorkbookFromCard(prev[targetId], nextTarget) || prev[targetId]
     }));
+    setSelectedCardId(targetId);
     setResult(prev => ({ ...prev, applied, appliedAt: new Date().toLocaleTimeString() }));
     pushLog(`回填: ${result.defender.name} 扣 HP ${applied.finalDamage}${applied.armorAbated ? "，护甲 SP -1" : ""}`);
   }
@@ -157,95 +173,126 @@ function App() {
       setToast("没有可撤销的伤害。");
       return;
     }
-    setCards(prev => ({ ...prev, [lastSnapshot.side]: lastSnapshot.card }));
-    setSources(prev => ({ ...prev, [lastSnapshot.side]: lastSnapshot.source }));
-    if (lastSnapshot.result) {
-      setResult(lastSnapshot.result);
-    }
-    pushLog(`撤销 ${lastSnapshot.side.toUpperCase()} 卡上次伤害。`);
+    setCards(prev => ({ ...prev, [lastSnapshot.id]: lastSnapshot.card }));
+    setSources(prev => ({ ...prev, [lastSnapshot.id]: lastSnapshot.source }));
+    setSelectedCardId(lastSnapshot.id);
+    if (lastSnapshot.result) setResult(lastSnapshot.result);
+    pushLog(`撤销 ${slotLabel(lastSnapshot.id)} 上次伤害。`);
     setLastSnapshot(null);
   }
 
-  async function saveDirect(side) {
+  async function saveDirect(id) {
     try {
-      const saved = await saveWorkbookToHandle(sources[side]);
-      setSources(prev => ({ ...prev, [side]: saved }));
-      setToast(`${side.toUpperCase()} 卡已保存回原文件`);
-      pushLog(`直接保存 ${side.toUpperCase()} 卡：${cards[side].name}`);
+      const saved = await saveWorkbookToHandle(sources[id]);
+      setSources(prev => ({ ...prev, [id]: saved }));
+      setToast(`${slotLabel(id)} 已保存回原文件`);
+      pushLog(`直接保存 ${slotLabel(id)}：${cards[id].name}`);
     } catch (error) {
       setToast(error.message);
     }
   }
 
+  function setAttacker(id) {
+    setConfig(prev => ({ ...prev, attacker: id, defender: prev.defender === id ? firstOtherId(cards, id) : prev.defender }));
+    setSelectedCardId(id);
+  }
+
+  function setDefender(id) {
+    setConfig(prev => ({ ...prev, defender: id, attacker: prev.attacker === id ? firstOtherId(cards, id) : prev.attacker }));
+    setSelectedCardId(id);
+  }
+
   function swapSides() {
     setConfig(prev => ({ ...prev, attacker: prev.defender, defender: prev.attacker }));
+    setSelectedCardId(config.defender);
+  }
+
+  function addCombatant() {
+    const nextIndex = combatants.length + 1;
+    const id = `slot-${nextIndex}`;
+    setCards(prev => ({ ...prev, [id]: createBlankCard(nextIndex) }));
+    setSources(prev => ({ ...prev, [id]: null }));
+    setSelectedCardId(id);
+    pushLog(`新增 ${slotLabel(id)}。`);
   }
 
   function resetDemo() {
     setCards(sampleCards);
-    setSources({ a: null, b: null });
+    setSources(blankSources(sampleCards));
     setConfig(initialConfig);
+    setSelectedCardId(initialConfig.attacker);
     setResult(null);
     setLog([]);
     setLastSnapshot(null);
   }
 
   function pushLog(text) {
-    setLog(prev => [text, ...prev].slice(0, 12));
+    setLog(prev => [text, ...prev].slice(0, 16));
   }
-
-  const threat = useMemo(() => estimateThreat(cards, config), [cards, config]);
 
   return (
     <main className="app-shell">
-      <section className="hero">
-        <div className="hero-copy">
-          <div className="brand-mark">
+      <header className="command-header">
+        <div className="brand-lockup">
+          <span className="brand-mark">
             <Terminal size={18} />
-            NIGHT CITY COMBAT CONSOLE
+          </span>
+          <div>
+            <h1>赛博朋克 RED 多人战斗结算台</h1>
+            <p>8+ 自动卡作战名册，任意选择攻击方与目标，结算后按键回填目标卡并支持撤回。</p>
           </div>
-          <h1>赛博朋克 RED 战斗结算台</h1>
-          <p>
-            拖入鲨鱼包/芬里尔自动卡，读取角色属性、战斗技能、HP、护甲和武器。结算先出结果，点击“回填写卡”后再改目标卡，并可撤回。
-          </p>
         </div>
-        <div className="hero-status">
-          <Metric icon={<Crosshair />} label="攻击方" value={attacker.name || config.attacker.toUpperCase()} />
-          <Metric icon={<Shield />} label="目标" value={defender.name || config.defender.toUpperCase()} />
-          <Metric icon={<Zap />} label="胜率倾向" value={threat.label} tone={threat.tone} />
+        <div className="header-metrics">
+          <Metric icon={<Users />} label="战斗人员" value={`${combatants.length} 张`} />
+          <Metric icon={<Crosshair />} label="攻击方" value={attacker.name || slotLabel(config.attacker)} />
+          <Metric icon={<Shield />} label="目标" value={defender.name || slotLabel(config.defender)} />
+          <Metric icon={<Zap />} label="态势" value={threat.label} tone={threat.tone} />
         </div>
-      </section>
+      </header>
 
-      <section className="workbench">
-        <div className="card-grid">
+      <section className="battle-grid">
+        <RosterPanel
+          combatants={combatants}
+          sources={sources}
+          config={config}
+          selectedCardId={selectedCardId}
+          dragSide={dragSide}
+          onDragSide={setDragSide}
+          onSelect={setSelectedCardId}
+          onSetAttacker={setAttacker}
+          onSetDefender={setDefender}
+          onDropFile={importFile}
+          onOpenPicker={openWithPicker}
+          onAdd={addCombatant}
+        />
+
+        <section className="center-stack">
+          <TacticalBoard
+            combatants={combatants}
+            cards={cards}
+            config={config}
+            attacker={attacker}
+            defender={defender}
+            threat={threat}
+            onSetAttacker={setAttacker}
+            onSetDefender={setDefender}
+            onSwap={swapSides}
+          />
           <CharacterPanel
-            side="a"
-            card={cards.a}
-            source={sources.a}
-            active={config.attacker === "a" ? "attacker" : config.defender === "a" ? "defender" : ""}
-            dragSide={dragSide}
-            onDragSide={setDragSide}
+            id={selectedCardId}
+            card={selectedCard}
+            source={selectedSource}
+            active={config.attacker === selectedCardId ? "attacker" : config.defender === selectedCardId ? "defender" : ""}
             onDropFile={importFile}
             onOpenPicker={openWithPicker}
             onSaveDirect={saveDirect}
             onChange={patchCard}
           />
-          <CharacterPanel
-            side="b"
-            card={cards.b}
-            source={sources.b}
-            active={config.attacker === "b" ? "attacker" : config.defender === "b" ? "defender" : ""}
-            dragSide={dragSide}
-            onDragSide={setDragSide}
-            onDropFile={importFile}
-            onOpenPicker={openWithPicker}
-            onSaveDirect={saveDirect}
-            onChange={patchCard}
-          />
-        </div>
+        </section>
 
         <aside className="side-stack">
           <CombatConsole
+            combatants={combatants}
             config={config}
             setConfig={setConfig}
             mode={mode}
@@ -271,42 +318,207 @@ function App() {
   );
 }
 
-function CharacterPanel({
-  side,
-  card,
-  source,
-  active,
+function RosterPanel({
+  combatants,
+  sources,
+  config,
+  selectedCardId,
   dragSide,
   onDragSide,
+  onSelect,
+  onSetAttacker,
+  onSetDefender,
   onDropFile,
   onOpenPicker,
-  onSaveDirect,
-  onChange
+  onAdd
+}) {
+  return (
+    <aside className="roster-panel">
+      <div className="panel-heading">
+        <div>
+          <h2>作战名册</h2>
+          <p>点击卡位编辑，或直接设为攻击方/目标。</p>
+        </div>
+        <button type="button" className="icon-button" onClick={onAdd} title="新增卡位">
+          <Plus size={17} />
+        </button>
+      </div>
+      <div className="roster-list">
+        {combatants.map(({ id, card, index }) => (
+          <RosterCard
+            key={id}
+            id={id}
+            card={card}
+            source={sources[id]}
+            index={index}
+            selected={selectedCardId === id}
+            role={config.attacker === id ? "attacker" : config.defender === id ? "defender" : ""}
+            dragging={dragSide === id}
+            onDragSide={onDragSide}
+            onSelect={onSelect}
+            onSetAttacker={onSetAttacker}
+            onSetDefender={onSetDefender}
+            onDropFile={onDropFile}
+            onOpenPicker={onOpenPicker}
+          />
+        ))}
+      </div>
+    </aside>
+  );
+}
+
+function RosterCard({
+  id,
+  card,
+  source,
+  index,
+  selected,
+  role,
+  dragging,
+  onDragSide,
+  onSelect,
+  onSetAttacker,
+  onSetDefender,
+  onDropFile,
+  onOpenPicker
 }) {
   const fileInputRef = useRef(null);
   const wound = woundState(card);
-  const sideLabel = side.toUpperCase();
-  const isDragging = dragSide === side;
+  const hpPercent = Math.max(0, Math.min(100, (num(card.hp) / Math.max(1, num(card.maxHp))) * 100));
 
   function handleDrop(event) {
     event.preventDefault();
     onDragSide(null);
-    onDropFile(side, event.dataTransfer.files?.[0]);
+    onDropFile(id, event.dataTransfer.files?.[0]);
   }
 
   return (
     <article
-      className={`runner-card ${active} ${isDragging ? "dragging" : ""}`}
+      className={`roster-card ${selected ? "selected" : ""} ${role} ${dragging ? "dragging" : ""}`}
+      onClick={() => onSelect(id)}
       onDragOver={event => {
         event.preventDefault();
-        onDragSide(side);
+        onDragSide(id);
       }}
       onDragLeave={() => onDragSide(null)}
       onDrop={handleDrop}
     >
+      <div className="roster-index">{String(index + 1).padStart(2, "0")}</div>
+      <div className="roster-main">
+        <div className="roster-title">
+          <strong>{card.name || slotLabel(id)}</strong>
+          <span className={`role-light ${role || wound.tone}`}>{role ? (role === "attacker" ? "攻击" : "目标") : wound.label}</span>
+        </div>
+        <p>{source?.fileName || card.alias || "拖拽 xlsx 到此卡位"}</p>
+        <div className="micro-bars">
+          <span className="hp-bar" style={{ width: `${hpPercent}%` }} />
+          <span className="sp-readout">SP {card.bodySp}/{card.headSp}</span>
+        </div>
+        <div className="roster-actions" onClick={event => event.stopPropagation()}>
+          <input
+            ref={fileInputRef}
+            className="file-input"
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={event => onDropFile(id, event.target.files?.[0])}
+          />
+          <button type="button" className="ghost-button" onClick={() => fileInputRef.current?.click()} title="选择导入">
+            <FileSpreadsheet size={14} />
+          </button>
+          <button type="button" className="ghost-button" onClick={() => onOpenPicker(id)} title="授权打开">
+            <FolderOpen size={14} />
+          </button>
+          <button type="button" className="ghost-button cyan" onClick={() => onSetAttacker(id)}>
+            攻
+          </button>
+          <button type="button" className="ghost-button red" onClick={() => onSetDefender(id)}>
+            目
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function TacticalBoard({ combatants, cards, config, attacker, defender, threat, onSetAttacker, onSetDefender, onSwap }) {
+  return (
+    <article className="tactical-board">
+      <div className="panel-heading">
+        <div>
+          <h2>目标选择矩阵</h2>
+          <p>从 8+ 名册中任意点选攻击方与目标。</p>
+        </div>
+        <button type="button" className="icon-button" onClick={onSwap} title="交换攻防">
+          <ArrowLeftRight size={17} />
+        </button>
+      </div>
+
+      <div className="versus-lane">
+        <CombatantSpot role="攻击方" tone="cyan" card={attacker} id={config.attacker} />
+        <div className="versus-core">
+          <Radar size={26} />
+          <strong>VS</strong>
+          <span className={threat.tone}>{threat.label}</span>
+        </div>
+        <CombatantSpot role="目标" tone="red" card={defender} id={config.defender} />
+      </div>
+
+      <div className="target-grid">
+        {combatants.map(({ id, card }) => (
+          <button
+            key={id}
+            type="button"
+            className={`target-node ${config.attacker === id ? "as-attacker" : ""} ${config.defender === id ? "as-defender" : ""}`}
+            onClick={() => (config.attacker === id ? onSetDefender(firstOtherId(cards, id)) : onSetDefender(id))}
+          >
+            <span>{slotLabel(id)}</span>
+            <strong>{card.name}</strong>
+            <small>HP {card.hp}/{card.maxHp} · SP {card.bodySp}</small>
+          </button>
+        ))}
+      </div>
+
+      <div className="quick-pick">
+        <SelectField label="快速选攻击方" value={config.attacker} onChange={onSetAttacker}>
+          {combatants.map(({ id, card }) => (
+            <option key={id} value={id}>
+              {slotLabel(id)} · {card.name}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField label="快速选目标" value={config.defender} onChange={onSetDefender}>
+          {combatants.map(({ id, card }) => (
+            <option key={id} value={id}>
+              {slotLabel(id)} · {card.name}
+            </option>
+          ))}
+        </SelectField>
+      </div>
+    </article>
+  );
+}
+
+function CombatantSpot({ role, tone, card, id }) {
+  const wound = woundState(card);
+  return (
+    <div className={`combatant-spot ${tone}`}>
+      <span>{role} · {slotLabel(id)}</span>
+      <strong>{card.name}</strong>
+      <p>{wound.label} / HP {card.hp}/{card.maxHp} / SP {card.bodySp}/{card.headSp}</p>
+    </div>
+  );
+}
+
+function CharacterPanel({ id, card, source, active, onDropFile, onOpenPicker, onSaveDirect, onChange }) {
+  const fileInputRef = useRef(null);
+  const wound = woundState(card);
+  const sideLabel = slotLabel(id);
+
+  return (
+    <article className={`runner-card ${active}`}>
       <div className="panel-top">
         <div>
-          <span className="side-chip">{sideLabel} 卡</span>
+          <span className="side-chip">{sideLabel}</span>
           <h2>{card.name || "未命名角色"}</h2>
           <p>{card.alias || source?.fileName || "手动卡 / 等待导入"}</p>
         </div>
@@ -315,7 +527,7 @@ function CharacterPanel({
 
       <div className="drop-zone">
         <UploadCloud size={20} />
-        <span>拖拽 xlsx 到这里导入</span>
+        <span>当前编辑卡位可拖拽 xlsx 到左侧名册导入</span>
         <small>{source?.fileName || "支持鲨鱼包/芬里尔 1.7+ 自动卡"}</small>
       </div>
 
@@ -325,27 +537,27 @@ function CharacterPanel({
           className="file-input"
           type="file"
           accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          onChange={event => onDropFile(side, event.target.files?.[0])}
+          onChange={event => onDropFile(id, event.target.files?.[0])}
         />
         <button type="button" className="secondary" onClick={() => fileInputRef.current?.click()}>
           <FileSpreadsheet size={16} />
           选择导入
         </button>
-        <button type="button" onClick={() => onOpenPicker(side)}>
+        <button type="button" onClick={() => onOpenPicker(id)}>
           <FolderOpen size={16} />
           授权打开
         </button>
-        <button type="button" className="secondary" disabled={!source?.canDirectSave} onClick={() => onSaveDirect(side)}>
+        <button type="button" className="secondary" disabled={!source?.canDirectSave} onClick={() => onSaveDirect(id)}>
           <Save size={16} />
           保存原卡
         </button>
       </div>
 
       <div className="vitals">
-        <NumberField label="当前 HP" value={card.hp} onChange={hp => onChange(side, { hp })} />
-        <NumberField label="最大 HP" value={card.maxHp} onChange={maxHp => onChange(side, { maxHp })} />
-        <NumberField label="身体 SP" value={card.bodySp} onChange={bodySp => onChange(side, { bodySp })} />
-        <NumberField label="头部 SP" value={card.headSp} onChange={headSp => onChange(side, { headSp })} />
+        <NumberField label="当前 HP" value={card.hp} onChange={hp => onChange(id, { hp })} />
+        <NumberField label="最大 HP" value={card.maxHp} onChange={maxHp => onChange(id, { maxHp })} />
+        <NumberField label="身体 SP" value={card.bodySp} onChange={bodySp => onChange(id, { bodySp })} />
+        <NumberField label="头部 SP" value={card.headSp} onChange={headSp => onChange(id, { headSp })} />
       </div>
 
       <div className="meter">
@@ -355,7 +567,7 @@ function CharacterPanel({
       <SectionTitle icon={<Activity size={16} />} title="属性" />
       <div className="compact-grid stats">
         {["int", "ref", "dex", "tech", "cool", "will", "move", "body"].map(key => (
-          <NumberField key={key} label={statLabels[key]} value={card[key]} onChange={value => onChange(side, { [key]: value })} />
+          <NumberField key={key} label={statLabels[key]} value={card[key]} onChange={value => onChange(id, { [key]: value })} />
         ))}
       </div>
 
@@ -367,7 +579,7 @@ function CharacterPanel({
             label={label}
             value={card.skills[key] || 0}
             sub={`基础 ${skillStatBase(card, key)}`}
-            onChange={value => onChange(side, { skills: { [key]: value } })}
+            onChange={value => onChange(id, { skills: { [key]: value } })}
           />
         ))}
       </div>
@@ -377,31 +589,47 @@ function CharacterPanel({
   );
 }
 
-function CombatConsole({ config, setConfig, mode, onResolve, onBaseOnly, onFillBack, onUndo, onSwap, onReset }) {
+function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseOnly, onFillBack, onUndo, onSwap, onReset }) {
   const attackType = attackModes[config.attackType] ? config.attackType : "ranged";
   const weapons = attackModes[attackType].weapons;
 
   function update(patch) {
-    setConfig(prev => ({ ...prev, ...patch }));
+    setConfig(prev => {
+      const next = { ...prev, ...patch };
+      if (next.attacker === next.defender) {
+        if (patch.attacker) next.defender = firstOtherId(Object.fromEntries(combatants.map(({ id, card }) => [id, card])), patch.attacker);
+        if (patch.defender) next.attacker = firstOtherId(Object.fromEntries(combatants.map(({ id, card }) => [id, card])), patch.defender);
+      }
+      return next;
+    });
   }
 
   return (
     <article className="console-panel">
       <div className="panel-heading">
-        <h2>结算器</h2>
+        <div>
+          <h2>结算器</h2>
+          <p>攻防对象可从任意卡位选择。</p>
+        </div>
         <button type="button" className="icon-button" onClick={onSwap} title="交换攻防">
           <ArrowLeftRight size={17} />
         </button>
       </div>
 
       <div className="control-grid">
-        <SelectField label="攻击方" value={config.attacker} onChange={attacker => update({ attacker, defender: attacker === "a" ? "b" : "a" })}>
-          <option value="a">A 卡</option>
-          <option value="b">B 卡</option>
+        <SelectField label="攻击方" value={config.attacker} onChange={attacker => update({ attacker })}>
+          {combatants.map(({ id, card }) => (
+            <option key={id} value={id}>
+              {slotLabel(id)} · {card.name}
+            </option>
+          ))}
         </SelectField>
-        <SelectField label="防守方" value={config.defender} onChange={defender => update({ defender, attacker: defender === "a" ? "b" : "a" })}>
-          <option value="b">B 卡</option>
-          <option value="a">A 卡</option>
+        <SelectField label="防守方" value={config.defender} onChange={defender => update({ defender })}>
+          {combatants.map(({ id, card }) => (
+            <option key={id} value={id}>
+              {slotLabel(id)} · {card.name}
+            </option>
+          ))}
         </SelectField>
         <SelectField
           label="攻击类型"
@@ -473,7 +701,7 @@ function ResultPanel({ result, config, onFillBack }) {
         <div className="panel-heading">
           <h2>结果</h2>
         </div>
-        <p>先导入或调整两张卡，然后点击“只看基础值”或“掷骰并结算”。</p>
+        <p>先从名册选择攻击方和目标，然后点击“只看基础值”或“掷骰并结算”。</p>
       </article>
     );
   }
@@ -537,7 +765,7 @@ function ResultPanel({ result, config, onFillBack }) {
             <Save size={16} />
             回填写卡
           </button>
-          <span>点击后才会修改目标卡 HP/SP；可用“撤回回填”还原。</span>
+          <span>只修改本次选中的目标卡；可用“撤回回填”还原。</span>
         </div>
       )}
       {result.applied && (
@@ -674,6 +902,15 @@ function estimateThreat(cards, config) {
   if (delta >= 1) return { label: "优势", tone: "good" };
   if (delta >= -2) return { label: "五五开", tone: "warn" };
   return { label: "危险", tone: "danger" };
+}
+
+function slotLabel(id) {
+  const match = String(id).match(/(\d+)$/);
+  return match ? `卡位 ${match[1]}` : id;
+}
+
+function firstOtherId(cards, currentId) {
+  return Object.keys(cards).find(id => id !== currentId) || currentId;
 }
 
 createRoot(document.getElementById("root")).render(<App />);

@@ -13,15 +13,48 @@ export const blankSkills = {
   firstAid: 0
 };
 
+export function createBlankCard(index = 1) {
+  return {
+    name: `未载入角色 ${index}`,
+    alias: "等待导入 / 手动编辑",
+    hp: 35,
+    maxHp: 35,
+    bodySp: 0,
+    headSp: 0,
+    deathPenalty: 0,
+    int: 0,
+    ref: 0,
+    dex: 0,
+    tech: 0,
+    cool: 0,
+    will: 0,
+    move: 0,
+    body: 0,
+    emp: 0,
+    skills: { ...blankSkills },
+    weapons: [],
+    source: null
+  };
+}
+
+function card(patch) {
+  return {
+    ...createBlankCard(),
+    ...patch,
+    skills: { ...blankSkills, ...(patch.skills || {}) },
+    weapons: patch.weapons || [],
+    source: null
+  };
+}
+
 export const sampleCards = {
-  a: {
+  "slot-1": card({
     name: "独狼 罗亚尔",
     alias: "走廊枪声",
     hp: 45,
     maxHp: 45,
     bodySp: 11,
     headSp: 11,
-    deathPenalty: 0,
     int: 5,
     ref: 8,
     dex: 7,
@@ -32,7 +65,6 @@ export const sampleCards = {
     body: 6,
     emp: 5,
     skills: {
-      ...blankSkills,
       handgun: 6,
       shoulderArms: 6,
       heavyWeapons: 2,
@@ -44,18 +76,15 @@ export const sampleCards = {
       athletics: 4,
       concentration: 2,
       firstAid: 2
-    },
-    weapons: [],
-    source: null
-  },
-  b: {
+    }
+  }),
+  "slot-2": card({
     name: "爆改帮派成员",
     alias: "巷口铁皮",
     hp: 35,
     maxHp: 35,
     bodySp: 7,
     headSp: 0,
-    deathPenalty: 0,
     int: 4,
     ref: 6,
     dex: 6,
@@ -66,15 +95,166 @@ export const sampleCards = {
     body: 8,
     emp: 3,
     skills: {
-      ...blankSkills,
       handgun: 2,
       meleeWeapon: 4,
       brawling: 6,
       evasion: 4,
       athletics: 2,
       concentration: 3
-    },
-    weapons: [],
-    source: null
-  }
+    }
+  }),
+  "slot-3": card({
+    name: "网络监察员",
+    alias: "黑冰回声",
+    hp: 32,
+    maxHp: 32,
+    bodySp: 4,
+    headSp: 0,
+    int: 7,
+    ref: 7,
+    dex: 6,
+    tech: 6,
+    cool: 6,
+    will: 6,
+    move: 6,
+    body: 4,
+    emp: 5,
+    skills: {
+      handgun: 4,
+      shoulderArms: 2,
+      evasion: 5,
+      athletics: 3,
+      concentration: 5,
+      firstAid: 3
+    }
+  }),
+  "slot-4": card({
+    name: "街头武士",
+    alias: "红线",
+    hp: 50,
+    maxHp: 50,
+    bodySp: 11,
+    headSp: 11,
+    int: 4,
+    ref: 8,
+    dex: 8,
+    tech: 3,
+    cool: 6,
+    will: 7,
+    move: 7,
+    body: 8,
+    emp: 3,
+    skills: {
+      handgun: 5,
+      meleeWeapon: 7,
+      brawling: 6,
+      martialArts: 6,
+      evasion: 7,
+      athletics: 5,
+      concentration: 3
+    }
+  }),
+  "slot-5": card({
+    name: "技术专家",
+    alias: "焊枪医生",
+    hp: 38,
+    maxHp: 38,
+    bodySp: 7,
+    headSp: 0,
+    int: 6,
+    ref: 6,
+    dex: 5,
+    tech: 8,
+    cool: 5,
+    will: 6,
+    move: 5,
+    body: 5,
+    emp: 5,
+    skills: {
+      handgun: 3,
+      shoulderArms: 3,
+      evasion: 3,
+      athletics: 2,
+      concentration: 4,
+      firstAid: 6
+    }
+  }),
+  "slot-6": card({
+    name: "全自动火力手",
+    alias: "弹链",
+    hp: 45,
+    maxHp: 45,
+    bodySp: 11,
+    headSp: 0,
+    int: 4,
+    ref: 8,
+    dex: 6,
+    tech: 4,
+    cool: 5,
+    will: 6,
+    move: 5,
+    body: 7,
+    emp: 3,
+    skills: {
+      handgun: 4,
+      shoulderArms: 6,
+      heavyWeapons: 5,
+      autofire: 7,
+      evasion: 5,
+      athletics: 3,
+      concentration: 3
+    }
+  }),
+  "slot-7": card({
+    name: "游牧驾驶员",
+    alias: "高速路幽灵",
+    hp: 40,
+    maxHp: 40,
+    bodySp: 7,
+    headSp: 7,
+    int: 5,
+    ref: 7,
+    dex: 7,
+    tech: 5,
+    cool: 6,
+    will: 5,
+    move: 7,
+    body: 6,
+    emp: 4,
+    skills: {
+      handgun: 4,
+      shoulderArms: 5,
+      meleeWeapon: 2,
+      brawling: 3,
+      evasion: 5,
+      athletics: 4,
+      concentration: 3
+    }
+  }),
+  "slot-8": card({
+    name: "医疗佣兵",
+    alias: "蓝灯",
+    hp: 36,
+    maxHp: 36,
+    bodySp: 4,
+    headSp: 0,
+    int: 6,
+    ref: 6,
+    dex: 6,
+    tech: 7,
+    cool: 5,
+    will: 7,
+    move: 6,
+    body: 5,
+    emp: 6,
+    skills: {
+      handgun: 4,
+      meleeWeapon: 2,
+      brawling: 2,
+      evasion: 4,
+      athletics: 3,
+      concentration: 5,
+      firstAid: 7
+    }
+  })
 };

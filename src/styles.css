@@ -1,19 +1,21 @@
 :root {
-  --bg: #090b10;
-  --panel: rgba(14, 18, 27, 0.82);
-  --panel-strong: rgba(18, 24, 36, 0.94);
+  --bg: #07090f;
+  --bg-2: #10131d;
+  --panel: rgba(13, 18, 28, 0.84);
+  --panel-strong: rgba(16, 22, 34, 0.94);
   --panel-soft: rgba(255, 255, 255, 0.055);
-  --line: rgba(146, 228, 255, 0.18);
-  --line-hot: rgba(255, 55, 98, 0.34);
-  --text: #f2f7fb;
-  --muted: #9fb0c4;
-  --cyan: #22d6ff;
-  --cyan-dim: rgba(34, 214, 255, 0.16);
+  --line: rgba(125, 231, 255, 0.18);
+  --line-hot: rgba(255, 47, 99, 0.36);
+  --text: #f4f8ff;
+  --muted: #94a7bd;
+  --cyan: #27d8ff;
+  --cyan-dim: rgba(39, 216, 255, 0.16);
   --red: #ff315d;
   --red-dim: rgba(255, 49, 93, 0.14);
   --yellow: #ffd166;
-  --green: #5cff9d;
-  --shadow: 0 22px 70px rgba(0, 0, 0, 0.44);
+  --green: #62ff9f;
+  --violet: #a78bfa;
+  --shadow: 0 24px 80px rgba(0, 0, 0, 0.5);
   font-family: "Microsoft YaHei", "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
   color: var(--text);
   background: var(--bg);
@@ -31,23 +33,36 @@ body {
   margin: 0;
   min-height: 100vh;
   background:
-    linear-gradient(180deg, rgba(5, 7, 11, 0.3), #090b10 78%),
-    linear-gradient(120deg, rgba(255, 49, 93, 0.24), transparent 30%),
-    linear-gradient(300deg, rgba(34, 214, 255, 0.22), transparent 34%),
-    radial-gradient(circle at 50% -20%, rgba(255, 209, 102, 0.16), transparent 28%),
-    #090b10;
+    linear-gradient(180deg, rgba(7, 9, 15, 0.58), #07090f 78%),
+    linear-gradient(120deg, rgba(255, 49, 93, 0.2), transparent 26%),
+    linear-gradient(290deg, rgba(39, 216, 255, 0.24), transparent 32%),
+    url("https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1800&q=80"),
+    #07090f;
+  background-attachment: fixed;
+  background-position: center;
+  background-size: cover;
 }
 
-body::before {
+body::before,
+body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
+}
+
+body::before {
   background:
-    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.026) 1px, transparent 1px);
-  background-size: 38px 38px;
-  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.85), transparent 80%);
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.028) 1px, transparent 1px);
+  background-size: 36px 36px;
+  mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.9), transparent 82%);
+}
+
+body::after {
+  background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.035) 0 1px, transparent 1px 9px);
+  opacity: 0.2;
+  mix-blend-mode: screen;
 }
 
 button,
@@ -57,31 +72,61 @@ select {
 }
 
 button {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   min-height: 38px;
-  border: 1px solid rgba(34, 214, 255, 0.4);
+  border: 1px solid rgba(39, 216, 255, 0.42);
   border-radius: 7px;
   padding: 0 14px;
-  color: #051018;
-  background: linear-gradient(180deg, #5ee7ff, #21c6f3);
-  box-shadow: 0 0 24px rgba(34, 214, 255, 0.18);
-  font-weight: 800;
+  color: #041018;
+  background: linear-gradient(180deg, #72edff, #1bc5ef);
+  box-shadow: 0 0 26px rgba(39, 216, 255, 0.2);
+  font-weight: 900;
   cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, box-shadow 160ms ease, background 160ms ease;
 }
 
-button.secondary {
+button:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 30px rgba(39, 216, 255, 0.34);
+}
+
+button.secondary,
+button.ghost-button {
   color: var(--text);
   background: rgba(255, 255, 255, 0.06);
   border-color: rgba(255, 255, 255, 0.16);
   box-shadow: none;
 }
 
+button.ghost-button {
+  min-height: 28px;
+  min-width: 30px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+button.ghost-button.cyan {
+  color: var(--cyan);
+  border-color: rgba(39, 216, 255, 0.38);
+}
+
+button.ghost-button.red {
+  color: #ff94aa;
+  border-color: rgba(255, 49, 93, 0.4);
+}
+
 button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+button:disabled:hover {
+  transform: none;
+  box-shadow: none;
 }
 
 button:focus-visible,
@@ -91,116 +136,101 @@ select:focus-visible {
   outline-offset: 2px;
 }
 
-.app-shell {
-  width: min(1500px, calc(100vw - 28px));
-  margin: 0 auto;
-  padding: 24px 0 42px;
-}
-
-.hero {
-  min-height: 220px;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.58fr);
-  gap: 18px;
-  align-items: stretch;
-  margin-bottom: 18px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
-  overflow: hidden;
-  background:
-    linear-gradient(90deg, rgba(8, 11, 18, 0.95), rgba(8, 11, 18, 0.72) 58%, rgba(8, 11, 18, 0.35)),
-    url("https://images.unsplash.com/photo-1519608487953-e999c86e7455?auto=format&fit=crop&w=1800&q=80");
-  background-position: center;
-  background-size: cover;
-  box-shadow: var(--shadow);
-}
-
-.hero-copy {
-  padding: clamp(22px, 4vw, 44px);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.brand-mark {
-  width: fit-content;
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  margin-bottom: 18px;
-  padding: 7px 10px;
-  color: var(--cyan);
-  border: 1px solid rgba(34, 214, 255, 0.35);
-  background: rgba(34, 214, 255, 0.08);
-  border-radius: 5px;
-  font-size: 12px;
-  font-weight: 900;
-}
-
 h1,
 h2,
 p {
   margin: 0;
 }
 
-.hero h1 {
-  max-width: 760px;
-  font-size: clamp(30px, 5vw, 62px);
-  line-height: 1.04;
+.app-shell {
+  width: min(1760px, calc(100vw - 24px));
+  margin: 0 auto;
+  padding: 18px 0 40px;
 }
 
-.hero p {
-  max-width: 780px;
-  margin-top: 16px;
-  color: #c6d4e5;
-  line-height: 1.72;
-}
-
-.hero-status {
+.command-header {
   display: grid;
-  align-content: end;
-  gap: 10px;
-  padding: 24px;
+  grid-template-columns: minmax(360px, 1fr) minmax(620px, 0.95fr);
+  gap: 14px;
+  align-items: stretch;
+  margin-bottom: 14px;
 }
 
-.workbench {
-  display: grid;
-  grid-template-columns: minmax(0, 1.08fr) minmax(390px, 0.62fr);
-  gap: 16px;
-  align-items: start;
-}
-
-.card-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-
+.brand-lockup,
+.header-metrics,
+.roster-panel,
 .runner-card,
-.console-panel {
+.console-panel,
+.tactical-board {
   border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--panel);
+  background: linear-gradient(180deg, rgba(18, 25, 39, 0.9), rgba(9, 13, 22, 0.84));
   backdrop-filter: blur(18px);
   box-shadow: var(--shadow);
 }
 
-.runner-card {
-  min-width: 0;
+.brand-lockup {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 112px;
+  padding: 18px 20px;
+  overflow: hidden;
+}
+
+.brand-lockup h1 {
+  font-size: clamp(24px, 2.6vw, 36px);
+  line-height: 1.08;
+}
+
+.brand-lockup p,
+.panel-heading p {
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.brand-mark {
+  width: 46px;
+  height: 46px;
+  flex: 0 0 46px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cyan);
+  border: 1px solid rgba(39, 216, 255, 0.45);
+  border-radius: 8px;
+  background: rgba(39, 216, 255, 0.09);
+  box-shadow: inset 0 0 22px rgba(39, 216, 255, 0.12), 0 0 24px rgba(39, 216, 255, 0.16);
+}
+
+.header-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  padding: 12px;
+}
+
+.battle-grid {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.52fr) minmax(460px, 1fr) minmax(360px, 0.72fr);
+  gap: 14px;
+  align-items: start;
+}
+
+.roster-panel,
+.runner-card,
+.console-panel,
+.tactical-board {
   padding: 16px;
 }
 
-.runner-card.attacker {
-  border-color: rgba(34, 214, 255, 0.5);
-}
-
-.runner-card.defender {
-  border-color: rgba(255, 49, 93, 0.48);
-}
-
-.runner-card.dragging {
-  border-color: var(--yellow);
-  background: rgba(255, 209, 102, 0.09);
+.roster-panel {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 30px);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .panel-top,
@@ -223,6 +253,290 @@ p {
   overflow-wrap: anywhere;
 }
 
+.roster-list {
+  display: grid;
+  gap: 9px;
+  margin-top: 14px;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.roster-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  padding: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(3, 7, 13, 0.62);
+  cursor: pointer;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease, box-shadow 160ms ease;
+}
+
+.roster-card:hover,
+.roster-card.selected {
+  transform: translateX(2px);
+  border-color: rgba(39, 216, 255, 0.5);
+  background: rgba(39, 216, 255, 0.075);
+}
+
+.roster-card.attacker {
+  border-color: rgba(39, 216, 255, 0.62);
+  box-shadow: inset 3px 0 0 var(--cyan);
+}
+
+.roster-card.defender {
+  border-color: rgba(255, 49, 93, 0.58);
+  box-shadow: inset 3px 0 0 var(--red);
+}
+
+.roster-card.dragging {
+  border-color: var(--yellow);
+  background: rgba(255, 209, 102, 0.1);
+}
+
+.roster-index {
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: var(--cyan);
+  border: 1px solid rgba(39, 216, 255, 0.28);
+  border-radius: 6px;
+  background: rgba(39, 216, 255, 0.08);
+  font-weight: 900;
+}
+
+.roster-main {
+  min-width: 0;
+}
+
+.roster-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.roster-title strong,
+.target-node strong,
+.combatant-spot strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.roster-card p {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.role-light {
+  flex: 0 0 auto;
+  padding: 3px 6px;
+  border-radius: 5px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.06);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.role-light.attacker,
+.role-light.good {
+  color: var(--green);
+}
+
+.role-light.defender,
+.role-light.danger {
+  color: var(--red);
+}
+
+.role-light.warn {
+  color: var(--yellow);
+}
+
+.micro-bars {
+  position: relative;
+  height: 8px;
+  margin-top: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.micro-bars .hp-bar {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--red), var(--yellow), var(--green));
+}
+
+.sp-readout {
+  position: absolute;
+  right: 0;
+  top: 12px;
+  color: #7d91aa;
+  font-size: 11px;
+}
+
+.roster-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.center-stack,
+.side-stack {
+  display: grid;
+  gap: 14px;
+}
+
+.tactical-board {
+  position: relative;
+  overflow: hidden;
+}
+
+.tactical-board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(105deg, transparent 0 42%, rgba(39, 216, 255, 0.12) 42% 43%, transparent 43%),
+    linear-gradient(285deg, transparent 0 54%, rgba(255, 49, 93, 0.12) 54% 55%, transparent 55%);
+}
+
+.versus-lane {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 118px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.combatant-spot {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 8px;
+  background: rgba(3, 7, 13, 0.66);
+}
+
+.combatant-spot.cyan {
+  border: 1px solid rgba(39, 216, 255, 0.4);
+  box-shadow: inset 0 0 28px rgba(39, 216, 255, 0.08);
+}
+
+.combatant-spot.red {
+  border: 1px solid rgba(255, 49, 93, 0.42);
+  box-shadow: inset 0 0 28px rgba(255, 49, 93, 0.08);
+}
+
+.combatant-spot span,
+.target-node span,
+.metric > span:first-child,
+.field > span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.combatant-spot strong {
+  display: block;
+  margin-top: 8px;
+  font-size: clamp(20px, 2vw, 30px);
+}
+
+.combatant-spot p {
+  margin-top: 8px;
+  color: #c5d4e6;
+  font-size: 13px;
+}
+
+.versus-core {
+  height: 118px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 5px;
+  color: var(--cyan);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  background:
+    conic-gradient(from 180deg, rgba(39, 216, 255, 0.18), rgba(255, 49, 93, 0.18), rgba(255, 209, 102, 0.12), rgba(39, 216, 255, 0.18)),
+    rgba(3, 7, 13, 0.76);
+  box-shadow: 0 0 38px rgba(39, 216, 255, 0.18);
+}
+
+.versus-core strong {
+  font-size: 26px;
+}
+
+.versus-core span {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.target-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 9px;
+  margin-top: 14px;
+}
+
+.target-node {
+  min-height: 86px;
+  display: grid;
+  align-content: center;
+  justify-items: start;
+  gap: 4px;
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.045);
+  border-color: rgba(255, 255, 255, 0.12);
+  text-align: left;
+}
+
+.target-node small {
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.target-node.as-attacker {
+  color: var(--cyan);
+  border-color: rgba(39, 216, 255, 0.58);
+  background: rgba(39, 216, 255, 0.08);
+}
+
+.target-node.as-defender {
+  color: #ff9bae;
+  border-color: rgba(255, 49, 93, 0.6);
+  background: rgba(255, 49, 93, 0.08);
+}
+
+.quick-pick {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.runner-card.attacker {
+  border-color: rgba(39, 216, 255, 0.55);
+}
+
+.runner-card.defender {
+  border-color: rgba(255, 49, 93, 0.52);
+}
+
 .side-chip,
 .status-pill,
 .wound {
@@ -238,7 +552,7 @@ p {
   margin-bottom: 8px;
   color: var(--cyan);
   background: var(--cyan-dim);
-  border: 1px solid rgba(34, 214, 255, 0.28);
+  border: 1px solid rgba(39, 216, 255, 0.28);
 }
 
 .wound.good,
@@ -264,9 +578,9 @@ p {
   margin: 14px 0;
   padding: 13px;
   color: var(--text);
-  border: 1px dashed rgba(34, 214, 255, 0.35);
+  border: 1px dashed rgba(39, 216, 255, 0.35);
   border-radius: 8px;
-  background: rgba(34, 214, 255, 0.06);
+  background: rgba(39, 216, 255, 0.06);
 }
 
 .drop-zone svg {
@@ -326,7 +640,7 @@ p {
   border: 1px solid rgba(255, 255, 255, 0.13);
   border-radius: 7px;
   color: var(--text);
-  background: rgba(3, 7, 13, 0.7);
+  background: rgba(3, 7, 13, 0.74);
   padding: 8px 10px;
 }
 
@@ -375,16 +689,6 @@ p {
 .weapon-list span {
   color: var(--muted);
   font-size: 12px;
-}
-
-.side-stack {
-  display: grid;
-  gap: 14px;
-}
-
-.console-panel {
-  padding: 16px;
-  background: var(--panel-strong);
 }
 
 .control-grid {
@@ -452,7 +756,7 @@ p {
 
 .metric strong {
   color: var(--text);
-  font-size: 19px;
+  font-size: 18px;
   overflow-wrap: anywhere;
 }
 
@@ -478,7 +782,7 @@ p {
   padding: 13px;
   border-radius: 8px;
   border-left: 4px solid var(--cyan);
-  background: rgba(34, 214, 255, 0.08);
+  background: rgba(39, 216, 255, 0.08);
   line-height: 1.7;
 }
 
@@ -515,9 +819,9 @@ p {
   gap: 10px;
   margin-top: 12px;
   padding: 12px;
-  border: 1px solid rgba(34, 214, 255, 0.2);
+  border: 1px solid rgba(39, 216, 255, 0.2);
   border-radius: 8px;
-  background: rgba(34, 214, 255, 0.07);
+  background: rgba(39, 216, 255, 0.07);
 }
 
 .result-actions span {
@@ -549,6 +853,7 @@ p {
   position: fixed;
   right: 18px;
   bottom: 18px;
+  z-index: 20;
   max-width: min(520px, calc(100vw - 36px));
   justify-content: flex-start;
   color: var(--text);
@@ -557,27 +862,51 @@ p {
   box-shadow: var(--shadow);
 }
 
-@media (max-width: 1250px) {
-  .workbench,
-  .hero,
-  .card-grid {
-    grid-template-columns: 1fr;
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+    animation: none !important;
   }
 }
 
-@media (max-width: 780px) {
+@media (max-width: 1100px) {
+  .command-header,
+  .battle-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .roster-panel {
+    position: static;
+    max-height: none;
+  }
+
+  .roster-list {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    overflow: visible;
+  }
+}
+
+@media (max-width: 900px) {
   .app-shell {
-    width: min(100vw - 18px, 1500px);
+    width: min(100vw - 18px, 1760px);
     padding-top: 10px;
   }
 
-  .hero-copy,
-  .hero-status,
+  .brand-lockup,
+  .header-metrics,
+  .roster-panel,
   .runner-card,
-  .console-panel {
+  .console-panel,
+  .tactical-board {
     padding: 14px;
   }
 
+  .header-metrics,
+  .roster-list,
+  .versus-lane,
+  .quick-pick,
   .vitals,
   .compact-grid.stats,
   .compact-grid.skills,
@@ -587,16 +916,32 @@ p {
   .toggle-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .versus-core {
+    grid-column: 1 / -1;
+    width: 112px;
+    justify-self: center;
+  }
+
+  .target-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
-@media (max-width: 480px) {
+@media (max-width: 560px) {
+  .brand-lockup,
+  .header-metrics,
+  .roster-list,
+  .versus-lane,
+  .quick-pick,
   .vitals,
   .compact-grid.stats,
   .compact-grid.skills,
   .control-grid,
   .formula-grid,
   .damage-ledger,
-  .toggle-grid {
+  .toggle-grid,
+  .target-grid {
     grid-template-columns: 1fr;
   }
 
