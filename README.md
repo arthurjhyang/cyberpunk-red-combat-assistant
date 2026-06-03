@@ -28,6 +28,18 @@ Open the Vite URL shown in the terminal.
 npm run build
 ```
 
+## Windows EXE
+
+```bash
+npm run dist:win
+```
+
+The portable executable is generated under `release/`, for example:
+
+```text
+release/Cyberpunk RED Combat Assistant-0.2.0-x64.exe
+```
+
 ## Notes
 
 Browser security only allows direct saving to the original Excel file when the card was opened through `授权打开`. Plain drag/drop or file selection can still read the card and apply in-memory writeback, but cannot silently overwrite the local file.

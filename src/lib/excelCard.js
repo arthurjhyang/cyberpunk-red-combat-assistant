@@ -42,26 +42,39 @@ const weaponRows = [5, 17, 29, 41];
 
 export async function readWorkbookFile(file, handle = null) {
   const buffer = await file.arrayBuffer();
+  return readWorkbookBuffer(file.name, buffer, handle);
+}
+
+export async function readWorkbookBuffer(fileName, buffer, handle = null) {
   const workbook = XLSX.read(buffer, {
     type: "array",
     cellFormula: true,
     cellStyles: true,
     cellDates: true
   });
-  const card = extractCard(workbook, file.name);
+  const card = extractCard(workbook, fileName);
   return {
-    fileName: file.name,
+    fileName,
     handle,
     workbook,
     card,
     dirty: false,
-    canDirectSave: Boolean(handle?.createWritable)
+    canDirectSave: Boolean(handle?.createWritable || handle?.electronPath)
   };
 }
 
 export async function openWorkbookWithPicker() {
+  if (window.electronFiles?.openWorkbook) {
+    const picked = await window.electronFiles.openWorkbook();
+    if (!picked) {
+      throw new Error("已取消选择文件。");
+    }
+    return readWorkbookBuffer(picked.fileName, base64ToArrayBuffer(picked.base64), {
+      electronPath: picked.filePath
+    });
+  }
   if (!window.showOpenFilePicker) {
-    throw new Error("当前浏览器不支持直接授权写回，请使用拖拽导入后导出新版 xlsx。");
+    throw new Error("当前环境不支持直接授权写回，请使用拖拽或选择导入。");
   }
   const [handle] = await window.showOpenFilePicker({
     multiple: false,
@@ -127,8 +140,16 @@ export function updateWorkbookFromCard(source, card) {
 }
 
 export async function saveWorkbookToHandle(source) {
+  if (source?.handle?.electronPath && window.electronFiles?.saveWorkbook) {
+    const buffer = writeWorkbookBuffer(source.workbook);
+    await window.electronFiles.saveWorkbook({
+      filePath: source.handle.electronPath,
+      base64: arrayBufferToBase64(buffer)
+    });
+    return { ...source, dirty: false };
+  }
   if (!source?.handle?.createWritable) {
-    throw new Error("这张卡没有授权文件句柄，请使用导出回写版。");
+    throw new Error("这张卡没有授权文件句柄，请先用“授权打开”载入原文件。");
   }
   const buffer = writeWorkbookBuffer(source.workbook);
   const writable = await source.handle.createWritable();
@@ -199,4 +220,23 @@ function writeWorkbookBuffer(workbook) {
     type: "array",
     cellStyles: true
   });
+}
+
+function base64ToArrayBuffer(base64) {
+  const binary = window.atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes.buffer;
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return window.btoa(binary);
 }
