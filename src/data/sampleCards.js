@@ -1,0 +1,80 @@
+export const blankSkills = {
+  handgun: 0,
+  shoulderArms: 0,
+  heavyWeapons: 0,
+  archery: 0,
+  autofire: 0,
+  meleeWeapon: 0,
+  brawling: 0,
+  martialArts: 0,
+  evasion: 0,
+  athletics: 0,
+  concentration: 0,
+  firstAid: 0
+};
+
+export const sampleCards = {
+  a: {
+    name: "独狼 罗亚尔",
+    alias: "走廊枪声",
+    hp: 45,
+    maxHp: 45,
+    bodySp: 11,
+    headSp: 11,
+    deathPenalty: 0,
+    int: 5,
+    ref: 8,
+    dex: 7,
+    tech: 4,
+    cool: 5,
+    will: 6,
+    move: 6,
+    body: 6,
+    emp: 5,
+    skills: {
+      ...blankSkills,
+      handgun: 6,
+      shoulderArms: 6,
+      heavyWeapons: 2,
+      archery: 2,
+      autofire: 6,
+      meleeWeapon: 4,
+      brawling: 4,
+      evasion: 6,
+      athletics: 4,
+      concentration: 2,
+      firstAid: 2
+    },
+    weapons: [],
+    source: null
+  },
+  b: {
+    name: "爆改帮派成员",
+    alias: "巷口铁皮",
+    hp: 35,
+    maxHp: 35,
+    bodySp: 7,
+    headSp: 0,
+    deathPenalty: 0,
+    int: 4,
+    ref: 6,
+    dex: 6,
+    tech: 3,
+    cool: 4,
+    will: 5,
+    move: 6,
+    body: 8,
+    emp: 3,
+    skills: {
+      ...blankSkills,
+      handgun: 2,
+      meleeWeapon: 4,
+      brawling: 6,
+      evasion: 4,
+      athletics: 2,
+      concentration: 3
+    },
+    weapons: [],
+    source: null
+  }
+};
