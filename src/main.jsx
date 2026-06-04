@@ -4,15 +4,19 @@ import {
   Activity,
   AlertTriangle,
   ArrowLeftRight,
+  BookOpen,
+  ClipboardList,
   Crosshair,
   FileSpreadsheet,
   FolderOpen,
   Maximize2,
   Minus,
+  Monitor,
   Plus,
   Radar,
   RotateCcw,
   Save,
+  Settings,
   Shield,
   Swords,
   Terminal,
@@ -71,6 +75,7 @@ function App() {
   const [toast, setToast] = useState("");
   const [dragSide, setDragSide] = useState(null);
   const [lastSnapshot, setLastSnapshot] = useState(null);
+  const [activeView, setActiveView] = useState("combat");
 
   const combatants = useMemo(() => Object.entries(cards).map(([id, card], index) => ({ id, card, index })), [cards]);
   const mode = selectedMode(config);
@@ -272,25 +277,15 @@ function App() {
     <>
       {isDesktopApp && <WindowTitleBar />}
       <main className={`app-shell ${isDesktopApp ? "with-titlebar" : ""}`}>
-        <header className="command-header">
-          <div className="brand-lockup">
-            <span className="brand-mark">
-              <Terminal size={18} />
-            </span>
-            <div>
-              <h1>赛博朋克 RED 多人战斗结算台</h1>
-              <p>8+ 自动卡作战名册，任意选择攻击方与目标，结算后按键回填目标卡并支持撤回。</p>
-            </div>
-          </div>
-          <div className="header-metrics">
-            <Metric icon={<Users />} label="战斗人员" value={`${combatants.length} 张`} />
-            <Metric icon={<Crosshair />} label="攻击方" value={attacker.name || slotLabel(config.attacker)} />
-            <Metric icon={<Shield />} label="目标" value={defender.name || slotLabel(config.defender)} />
-            <Metric icon={<Zap />} label="态势" value={threat.label} tone={threat.tone} />
-          </div>
-        </header>
+        <TerminalNav
+          activeView={activeView}
+          onChange={setActiveView}
+          combatants={combatants}
+          autoRollDamage={config.autoRollDamage}
+        />
 
-        <section className="battle-grid">
+        {activeView === "combat" && (
+        <section className="terminal-layout">
           <RosterPanel
             combatants={combatants}
             sources={sources}
@@ -307,7 +302,7 @@ function App() {
             onRemove={removeCombatant}
           />
 
-          <section className="center-stack">
+          <section className="combat-stage">
             <TacticalBoard
               combatants={combatants}
               cards={cards}
@@ -315,25 +310,15 @@ function App() {
               attacker={attacker}
               defender={defender}
               threat={threat}
+              mode={mode}
               onSetAttacker={setAttacker}
               onSetDefender={setDefender}
+              onConfigChange={setConfig}
               onSwap={swapSides}
-            />
-            <CharacterPanel
-              id={selectedCardId}
-              card={selectedCard}
-              source={selectedSource}
-              active={config.attacker === selectedCardId ? "attacker" : config.defender === selectedCardId ? "defender" : ""}
-              onDropFile={importFile}
-              onOpenPicker={openWithPicker}
-              onSaveDirect={saveDirect}
-              onChange={patchCard}
-              onRemove={removeCombatant}
-              canRemove={combatants.length > 2}
             />
           </section>
 
-          <aside className="side-stack">
+          <aside className="ops-column">
             <CombatConsole
               combatants={combatants}
               config={config}
@@ -350,6 +335,59 @@ function App() {
             <LogPanel log={log} onClear={() => setLog([])} />
           </aside>
         </section>
+        )}
+
+        {activeView === "cards" && (
+          <section className="management-layout">
+            <RosterPanel
+              combatants={combatants}
+              sources={sources}
+              config={config}
+              selectedCardId={selectedCardId}
+              dragSide={dragSide}
+              onDragSide={setDragSide}
+              onSelect={setSelectedCardId}
+              onSetAttacker={setAttacker}
+              onSetDefender={setDefender}
+              onDropFile={importFile}
+              onOpenPicker={openWithPicker}
+              onAdd={addCombatant}
+              onRemove={removeCombatant}
+            />
+            <CharacterPanel
+              id={selectedCardId}
+              card={selectedCard}
+              source={selectedSource}
+              active={config.attacker === selectedCardId ? "attacker" : config.defender === selectedCardId ? "defender" : ""}
+              onDropFile={importFile}
+              onOpenPicker={openWithPicker}
+              onSaveDirect={saveDirect}
+              onChange={patchCard}
+              onRemove={removeCombatant}
+              canRemove={combatants.length > 2}
+            />
+          </section>
+        )}
+
+        {activeView === "log" && (
+          <section className="log-workspace">
+            <LogPanel log={log} onClear={() => setLog([])} />
+          </section>
+        )}
+
+        {activeView === "settings" && (
+          <section className="settings-workspace">
+            <article className="console-panel">
+              <div className="panel-heading">
+                <h2>设置</h2>
+              </div>
+              <div className="rule-hints">
+                <span>当前版本：本地文件桥接 / 直接回填写卡 / 伤害撤回</span>
+                <span>自动回填：{config.autoRollDamage ? "自动掷伤害" : "仅手动结果"}</span>
+              </div>
+            </article>
+          </section>
+        )}
 
         {toast && (
           <button className="toast" type="button" onClick={() => setToast("")}>
@@ -359,6 +397,53 @@ function App() {
         )}
       </main>
     </>
+  );
+}
+
+function TerminalNav({ activeView, onChange, combatants, autoRollDamage }) {
+  const [now, setNow] = useState(() => new Date());
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(new Date()), 1000);
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const tabs = [
+    { id: "combat", label: "战斗结算", icon: <Crosshair size={15} /> },
+    { id: "cards", label: "角色卡管理", icon: <BookOpen size={15} /> },
+    { id: "log", label: "战斗日志", icon: <ClipboardList size={15} /> },
+    { id: "settings", label: "设置", icon: <Settings size={15} /> }
+  ];
+
+  return (
+    <header className="terminal-nav">
+      <div className="nav-brand">
+        <span className="brand-mark compact">
+          <Terminal size={16} />
+        </span>
+        <strong>战斗助手</strong>
+        <span>NIGHT CITY</span>
+      </div>
+      <nav className="nav-tabs" aria-label="主模块">
+        {tabs.map(tab => (
+          <button
+            key={tab.id}
+            type="button"
+            className={activeView === tab.id ? "active" : ""}
+            onClick={() => onChange(tab.id)}
+          >
+            {tab.icon}
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+      <div className="nav-status">
+        <span><Monitor size={14} /> 桌面模式</span>
+        <span>战斗人员 {combatants.length}/12</span>
+        <span>自动回填：<strong>{autoRollDamage ? "手动确认" : "关闭"}</strong></span>
+        <time>{now.toLocaleTimeString("zh-CN", { hour12: false })}</time>
+      </div>
+    </header>
   );
 }
 
@@ -419,16 +504,23 @@ function RosterPanel({
   onAdd,
   onRemove
 }) {
+  const [compact, setCompact] = useState(false);
+
   return (
-    <aside className="roster-panel">
+    <aside className={`roster-panel ${compact ? "compact" : ""}`}>
       <div className="panel-heading">
         <div>
           <h2>作战名册</h2>
           <p>点击卡位编辑，或直接设为攻击方/目标。</p>
         </div>
-        <button type="button" className="icon-button" onClick={onAdd} title="新增卡位">
-          <Plus size={17} />
-        </button>
+        <div className="panel-tools">
+          <button type="button" className="icon-button secondary" onClick={() => setCompact(prev => !prev)} title="切换列表密度">
+            <ClipboardList size={16} />
+          </button>
+          <button type="button" className="icon-button" onClick={onAdd} title="新增卡位">
+            <Plus size={17} />
+          </button>
+        </div>
       </div>
       <div className="roster-list">
         {combatants.map(({ id, card, index }) => (
@@ -494,7 +586,8 @@ function RosterCard({
       onDragLeave={() => onDragSide(null)}
       onDrop={handleDrop}
     >
-      <div className="roster-index">{String(index + 1).padStart(2, "0")}</div>
+      <div className="roster-index">{index + 1}</div>
+      <Avatar card={card} index={index} />
       <div className="roster-main">
         <div className="roster-title">
           <strong>{card.name || slotLabel(id)}</strong>
@@ -534,20 +627,49 @@ function RosterCard({
   );
 }
 
-function TacticalBoard({ combatants, cards, config, attacker, defender, threat, onSetAttacker, onSetDefender, onSwap }) {
+function Avatar({ card, index = 0 }) {
+  const initial = String(card?.name || "?").trim().slice(0, 1).toUpperCase() || "?";
+  return (
+    <span className="avatar" style={{ "--avatar-hue": (index * 47 + 190) % 360 }}>
+      {card?.avatar ? <img src={card.avatar} alt="" /> : <b>{initial}</b>}
+    </span>
+  );
+}
+
+function TacticalBoard({ combatants, config, attacker, defender, threat, mode, onSetAttacker, onSetDefender, onConfigChange, onSwap }) {
+  const [nextPick, setNextPick] = useState("attacker");
+  const attackerIndex = combatants.findIndex(item => item.id === config.attacker);
+  const defenderIndex = combatants.findIndex(item => item.id === config.defender);
+  const attackerPoint = mapPoint(attackerIndex < 0 ? 0 : attackerIndex);
+  const defenderPoint = mapPoint(defenderIndex < 0 ? 1 : defenderIndex);
+
+  function pickToken(id) {
+    if (nextPick === "attacker") {
+      onSetAttacker(id);
+      setNextPick("defender");
+    } else {
+      onSetDefender(id);
+      setNextPick("attacker");
+    }
+  }
+
+  function setDistance(distanceBand) {
+    onConfigChange(prev => ({ ...prev, distanceBand }));
+  }
+
   return (
     <article className="tactical-board">
       <div className="panel-heading">
         <div>
-          <h2>目标选择矩阵</h2>
-          <p>从 8+ 名册中任意点选攻击方与目标。</p>
+          <h2>当前对决</h2>
+          <p>点击战场 token：下一次指定{nextPick === "attacker" ? "攻击方" : "目标"}。</p>
         </div>
         <button type="button" className="icon-button" onClick={onSwap} title="交换攻防">
           <ArrowLeftRight size={17} />
         </button>
       </div>
 
-      <div className="versus-lane">
+      <div className="duel-lane">
         <CombatantSpot role="攻击方" tone="cyan" card={attacker} id={config.attacker} />
         <div className="versus-core">
           <Radar size={26} />
@@ -557,36 +679,49 @@ function TacticalBoard({ combatants, cards, config, attacker, defender, threat, 
         <CombatantSpot role="目标" tone="red" card={defender} id={config.defender} />
       </div>
 
-      <div className="target-grid">
-        {combatants.map(({ id, card }) => (
+      <div className="distance-strip">
+        {distanceBands.map((label, index) => {
+          const dv = config.attackType === "autofire"
+            ? autofireDv[mode.weapon.family]?.[index]
+            : rangeDv[mode.weapon.family]?.[index];
+          const disabled = !mode.attack.fixedDv && dv == null && mode.attack.defender === "range";
+          return (
+            <button
+              key={label}
+              type="button"
+              className={num(config.distanceBand) === index ? "active" : ""}
+              disabled={disabled}
+              onClick={() => setDistance(index)}
+            >
+              <strong>{label}</strong>
+              <span>{mode.attack.fixedDv ? `DV ${mode.attack.fixedDv}` : dv ? `DV ${dv}` : "不可用"}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="battle-map" style={{
+        "--attacker-x": `${attackerPoint.x}%`,
+        "--attacker-y": `${attackerPoint.y}%`,
+        "--defender-x": `${defenderPoint.x}%`,
+        "--defender-y": `${defenderPoint.y}%`
+      }}>
+        <div className="attack-vector" />
+        {combatants.map(({ id, card, index }) => {
+          const point = mapPoint(index);
+          return (
           <button
             key={id}
             type="button"
-            className={`target-node ${config.attacker === id ? "as-attacker" : ""} ${config.defender === id ? "as-defender" : ""}`}
-            onClick={() => (config.attacker === id ? onSetDefender(firstOtherId(cards, id)) : onSetDefender(id))}
+            className={`map-token ${config.attacker === id ? "as-attacker" : ""} ${config.defender === id ? "as-defender" : ""}`}
+            style={{ left: `${point.x}%`, top: `${point.y}%` }}
+            onClick={() => pickToken(id)}
           >
-            <span>{slotLabel(id)}</span>
-            <strong>{card.name}</strong>
-            <small>HP {card.hp}/{card.maxHp} · SP {card.bodySp}</small>
+            <Avatar card={card} index={index} />
+            <span>{index + 1}</span>
           </button>
-        ))}
-      </div>
-
-      <div className="quick-pick">
-        <SelectField label="快速选攻击方" value={config.attacker} onChange={onSetAttacker}>
-          {combatants.map(({ id, card }) => (
-            <option key={id} value={id}>
-              {slotLabel(id)} · {card.name}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField label="快速选目标" value={config.defender} onChange={onSetDefender}>
-          {combatants.map(({ id, card }) => (
-            <option key={id} value={id}>
-              {slotLabel(id)} · {card.name}
-            </option>
-          ))}
-        </SelectField>
+          );
+        })}
       </div>
     </article>
   );
@@ -596,9 +731,19 @@ function CombatantSpot({ role, tone, card, id }) {
   const wound = woundState(card);
   return (
     <div className={`combatant-spot ${tone}`}>
-      <span>{role} · {slotLabel(id)}</span>
+      <div className="spot-top">
+        <span>{role} · {slotLabel(id)}</span>
+        <Avatar card={card} index={Number(String(id).match(/(\d+)$/)?.[1] || 1) - 1} />
+      </div>
       <strong>{card.name}</strong>
-      <p>{wound.label} / HP {card.hp}/{card.maxHp} / SP {card.bodySp}/{card.headSp}</p>
+      <p>{card.alias || wound.label}</p>
+      <div className="spot-stats">
+        <span>REF <b>{card.ref}</b></span>
+        <span>DEX <b>{card.dex}</b></span>
+        <span>BODY <b>{card.body}</b></span>
+        <span>HP <b>{card.hp}/{card.maxHp}</b></span>
+        <span>SP <b>{card.bodySp}/{card.headSp}</b></span>
+      </div>
     </div>
   );
 }
@@ -697,8 +842,6 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
   const attackType = attackModes[config.attackType] ? config.attackType : "ranged";
   const weapons = attackModes[attackType].weapons;
   const isAreaAttack = Boolean(attackModes[attackType].area || mode.weapon.area);
-  const distanceTable = attackType === "autofire" ? autofireDv : rangeDv;
-  const activeDv = distanceTable[mode.weapon.family]?.[num(config.distanceBand)] ?? attackModes[attackType].fixedDv ?? null;
 
   function update(patch) {
     setConfig(prev => {
@@ -741,20 +884,39 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
             </option>
           ))}
         </SelectField>
+        <SelectField
+          label="攻击类型"
+          value={attackType}
+          onChange={value => update({ attackType: value, weaponId: attackModes[value].weapons[0].id })}
+        >
+          {Object.entries(attackModes).map(([key, attack]) => (
+            <option key={key} value={key}>
+              {attack.label}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField label="武器/动作" value={mode.weapon.id} onChange={weaponId => update({ weaponId })}>
+          {weapons.map(weapon => (
+            <option key={weapon.id} value={weapon.id}>
+              {[weapon.label, skillLabels[weapon.skill], weapon.damage, weapon.cap ? `x${weapon.cap}` : weapon.rof ? `ROF ${weapon.rof}` : ""].filter(Boolean).join(" / ")}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField label="距离" value={String(config.distanceBand)} onChange={distanceBand => update({ distanceBand: Number(distanceBand) })}>
+          {distanceBands.map((label, index) => (
+            <option key={label} value={index}>
+              {label}
+            </option>
+          ))}
+        </SelectField>
+        <SelectField label="命中部位" value={config.targetPart} onChange={targetPart => update({ targetPart })}>
+          <option value="body">身体</option>
+          <option value="head" disabled={isAreaAttack}>头部 / 弱点</option>
+        </SelectField>
         <NumberField label="手动修正" value={config.modifier} onChange={modifier => update({ modifier })} />
         <TextField label="固定命中骰" value={config.attackDie} placeholder="空=随机" onChange={attackDie => update({ attackDie })} />
         <TextField label="固定防御骰" value={config.defenseDie} placeholder="空=随机" onChange={defenseDie => update({ defenseDie })} />
       </div>
-
-      <TacticalSwitchboard
-        attackType={attackType}
-        weapons={weapons}
-        mode={mode}
-        config={config}
-        activeDv={activeDv}
-        isAreaAttack={isAreaAttack}
-        onChange={update}
-      />
 
       <div className="toggle-grid">
         <CheckField label="瞄准/弱点 -8" checked={config.aimed} onChange={aimed => update({ aimed })} />
@@ -877,97 +1039,6 @@ function ResultPanel({ result, config, onFillBack }) {
         </div>
       )}
     </article>
-  );
-}
-
-function TacticalSwitchboard({ attackType, weapons, mode, config, activeDv, isAreaAttack, onChange }) {
-  return (
-    <div className="tactical-switchboard">
-      <div className="switchboard-head">
-        <span>FIRE CONTROL</span>
-        <strong>{activeDv ? `DV ${activeDv}` : mode.attack.fixedDv ? `固定 DV ${mode.attack.fixedDv}` : "需对抗"}</strong>
-      </div>
-
-      <div className="chip-section">
-        <span>攻击协议</span>
-        <div className="chip-grid attack-protocols">
-          {Object.entries(attackModes).map(([key, attack]) => (
-            <button
-              key={key}
-              type="button"
-              className={`terminal-chip ${attackType === key ? "active" : ""}`}
-              onClick={() => onChange({ attackType: key, weaponId: attack.weapons[0].id })}
-            >
-              <strong>{attack.label}</strong>
-              <small>{statLabels[attack.stat]} / {attack.defender === "range" ? "射程DV" : attack.defender === "dv" ? `固定DV ${attack.fixedDv}` : "对抗"}</small>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="chip-section">
-        <span>武器 / 动作</span>
-        <div className="chip-grid weapon-protocols">
-          {weapons.map(weapon => (
-            <button
-              key={weapon.id}
-              type="button"
-              className={`terminal-chip ${mode.weapon.id === weapon.id ? "active hot" : ""}`}
-              onClick={() => onChange({ weaponId: weapon.id })}
-            >
-              <strong>{weapon.label}</strong>
-              <small>{[skillLabels[weapon.skill], weapon.damage, weapon.cap ? `x${weapon.cap}` : weapon.rof ? `ROF ${weapon.rof}` : ""].filter(Boolean).join(" / ")}</small>
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="chip-section">
-        <span>距离窗口</span>
-        <div className="distance-rail">
-          {distanceBands.map((label, index) => {
-            const dv = attackType === "autofire"
-              ? autofireDv[mode.weapon.family]?.[index]
-              : rangeDv[mode.weapon.family]?.[index];
-            const disabled = !mode.attack.fixedDv && dv == null && mode.attack.defender === "range";
-            return (
-              <button
-                key={label}
-                type="button"
-                className={`distance-node ${num(config.distanceBand) === index ? "active" : ""}`}
-                disabled={disabled}
-                onClick={() => onChange({ distanceBand: index })}
-              >
-                <strong>{label}</strong>
-                <small>{mode.attack.fixedDv ? `固定 ${mode.attack.fixedDv}` : dv ? `DV ${dv}` : "不可用"}</small>
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <div className="hit-zone-panel">
-        <button
-          type="button"
-          className={`hit-zone ${config.targetPart === "body" ? "active" : ""}`}
-          onClick={() => onChange({ targetPart: "body" })}
-        >
-          <span>BODY</span>
-          <strong>身体</strong>
-          <small>使用身体 SP</small>
-        </button>
-        <button
-          type="button"
-          className={`hit-zone ${config.targetPart === "head" ? "active danger" : ""}`}
-          disabled={isAreaAttack}
-          onClick={() => onChange({ targetPart: "head" })}
-        >
-          <span>HEAD</span>
-          <strong>头部 / 弱点</strong>
-          <small>{isAreaAttack ? "区域攻击禁用" : "-8，穿甲后 x2"}</small>
-        </button>
-      </div>
-    </div>
   );
 }
 
@@ -1145,6 +1216,24 @@ function slotLabel(id) {
 
 function firstOtherId(cards, currentId) {
   return Object.keys(cards).find(id => id !== currentId) || currentId;
+}
+
+function mapPoint(index) {
+  const points = [
+    { x: 14, y: 22 },
+    { x: 78, y: 28 },
+    { x: 38, y: 42 },
+    { x: 58, y: 22 },
+    { x: 22, y: 70 },
+    { x: 46, y: 75 },
+    { x: 64, y: 62 },
+    { x: 82, y: 72 },
+    { x: 31, y: 28 },
+    { x: 70, y: 44 },
+    { x: 12, y: 58 },
+    { x: 88, y: 52 }
+  ];
+  return points[index % points.length];
 }
 
 createRoot(document.getElementById("root")).render(<App />);

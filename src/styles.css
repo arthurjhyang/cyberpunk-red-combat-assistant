@@ -185,10 +185,10 @@ p {
 }
 
 .app-shell {
-  width: min(1760px, calc(100vw - 24px));
+  width: min(1920px, calc(100vw - 8px));
   height: 100vh;
   margin: 0 auto;
-  padding: 18px 0;
+  padding: 8px 0 4px;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
   overflow: hidden;
@@ -196,7 +196,148 @@ p {
 
 .app-shell.with-titlebar {
   height: calc(100vh - 46px);
-  padding-top: 12px;
+  padding-top: 8px;
+}
+
+.terminal-nav {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: 240px minmax(360px, 1fr) auto;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 8px;
+  border: 1px solid rgba(39, 216, 255, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(5, 11, 18, 0.96), rgba(9, 16, 26, 0.9)),
+    rgba(3, 7, 13, 0.82);
+  box-shadow: 0 12px 38px rgba(0, 0, 0, 0.36);
+  overflow: hidden;
+}
+
+.nav-brand,
+.nav-status,
+.nav-tabs {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+}
+
+.nav-brand {
+  gap: 9px;
+  padding: 0 14px;
+  border-right: 1px solid rgba(39, 216, 255, 0.16);
+}
+
+.brand-mark.compact {
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+}
+
+.nav-brand strong {
+  color: var(--cyan);
+  font-size: 16px;
+}
+
+.nav-brand span:last-child {
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.nav-tabs {
+  gap: 2px;
+  padding: 6px;
+}
+
+.nav-tabs button {
+  min-height: 38px;
+  min-width: 128px;
+  color: var(--muted);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  clip-path: polygon(12px 0, 100% 0, calc(100% - 12px) 100%, 0 100%);
+}
+
+.nav-tabs button.active {
+  color: var(--text);
+  border-color: rgba(39, 216, 255, 0.46);
+  background: linear-gradient(180deg, rgba(39, 216, 255, 0.18), rgba(39, 216, 255, 0.06));
+  box-shadow: inset 0 -2px 0 var(--cyan), 0 0 18px rgba(39, 216, 255, 0.12);
+}
+
+.nav-status {
+  gap: 8px;
+  justify-content: flex-end;
+  padding: 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.nav-status span,
+.nav-status time {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.nav-status strong,
+.nav-status time {
+  color: var(--cyan);
+}
+
+.terminal-layout,
+.management-layout {
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.terminal-layout {
+  grid-template-columns: minmax(300px, 0.72fr) minmax(560px, 1.36fr) minmax(390px, 0.92fr);
+}
+
+.management-layout {
+  grid-template-columns: minmax(320px, 0.45fr) minmax(680px, 1fr);
+}
+
+.combat-stage,
+.ops-column {
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.combat-stage {
+  display: grid;
+}
+
+.ops-column {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 165px 135px;
+  gap: 8px;
+}
+
+.ops-column > .console-panel {
+  min-height: 0;
+  overflow: auto;
+}
+
+.log-workspace,
+.settings-workspace {
+  min-height: 0;
+  height: 100%;
+  overflow: auto;
 }
 
 .window-titlebar {
@@ -415,6 +556,21 @@ button.window-button.close:hover {
   overflow: hidden;
 }
 
+.roster-panel .panel-heading {
+  align-items: center;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.roster-panel .panel-heading h2 {
+  font-size: 18px;
+}
+
+.roster-panel .panel-heading p {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .panel-top,
 .panel-heading {
   display: flex;
@@ -448,10 +604,11 @@ button.window-button.close:hover {
 .roster-card {
   position: relative;
   display: grid;
-  grid-template-columns: 36px minmax(0, 1fr);
-  gap: 10px;
+  grid-template-columns: 26px 58px minmax(0, 1fr);
+  gap: 8px;
   min-width: 0;
-  padding: 11px;
+  min-height: 76px;
+  padding: 8px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 8px;
   background: rgba(3, 7, 13, 0.62);
@@ -482,14 +639,41 @@ button.window-button.close:hover {
 }
 
 .roster-index {
-  height: 36px;
+  height: 100%;
   display: grid;
   place-items: center;
   color: var(--cyan);
-  border: 1px solid rgba(39, 216, 255, 0.28);
-  border-radius: 6px;
-  background: rgba(39, 216, 255, 0.08);
+  border-right: 1px solid rgba(39, 216, 255, 0.18);
   font-weight: 900;
+}
+
+.avatar {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  color: #041018;
+  border: 1px solid hsla(var(--avatar-hue), 100%, 66%, 0.5);
+  border-radius: 7px;
+  background:
+    radial-gradient(circle at 30% 25%, hsla(var(--avatar-hue), 100%, 76%, 0.95), transparent 34%),
+    linear-gradient(135deg, hsla(var(--avatar-hue), 100%, 45%, 0.8), rgba(255, 49, 93, 0.72)),
+    rgba(3, 7, 13, 0.7);
+  box-shadow: inset 0 0 20px rgba(255, 255, 255, 0.08), 0 0 18px hsla(var(--avatar-hue), 100%, 54%, 0.16);
+  flex: 0 0 auto;
+}
+
+.avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar b {
+  color: rgba(255, 255, 255, 0.94);
+  font-size: 24px;
+  text-shadow: 0 0 18px rgba(0, 0, 0, 0.8);
 }
 
 .roster-main {
@@ -504,7 +688,6 @@ button.window-button.close:hover {
 }
 
 .roster-title strong,
-.target-node strong,
 .combatant-spot strong {
   overflow: hidden;
   text-overflow: ellipsis;
@@ -572,7 +755,40 @@ button.window-button.close:hover {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  margin-top: 10px;
+  margin-top: 7px;
+}
+
+.roster-actions .ghost-button {
+  min-height: 24px;
+  min-width: 26px;
+}
+
+.roster-panel.compact .roster-list {
+  gap: 6px;
+}
+
+.roster-panel.compact .roster-card {
+  grid-template-columns: 24px 42px minmax(0, 1fr);
+  min-height: 58px;
+  padding: 6px;
+}
+
+.roster-panel.compact .avatar {
+  width: 42px;
+  height: 42px;
+}
+
+.roster-panel.compact .avatar b {
+  font-size: 18px;
+}
+
+.roster-panel.compact .roster-card p,
+.roster-panel.compact .roster-actions {
+  display: none;
+}
+
+.roster-panel.compact .micro-bars {
+  margin-top: 6px;
 }
 
 .center-stack,
@@ -595,6 +811,10 @@ button.window-button.close:hover {
 
 .tactical-board {
   position: relative;
+  min-height: 0;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
   overflow: hidden;
 }
 
@@ -608,20 +828,26 @@ button.window-button.close:hover {
     linear-gradient(285deg, transparent 0 54%, rgba(255, 49, 93, 0.12) 54% 55%, transparent 55%);
 }
 
-.versus-lane {
+.duel-lane {
   position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 118px minmax(0, 1fr);
-  gap: 12px;
+  grid-template-columns: minmax(0, 1fr) 112px minmax(0, 1fr);
+  gap: 10px;
   align-items: center;
-  margin-top: 16px;
+  margin-top: 10px;
 }
 
 .combatant-spot {
   min-width: 0;
-  padding: 16px;
+  min-height: 260px;
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 14px;
   border-radius: 8px;
-  background: rgba(3, 7, 13, 0.66);
+  background:
+    linear-gradient(180deg, rgba(3, 7, 13, 0.44), rgba(3, 7, 13, 0.82)),
+    rgba(3, 7, 13, 0.66);
 }
 
 .combatant-spot.cyan {
@@ -635,7 +861,6 @@ button.window-button.close:hover {
 }
 
 .combatant-spot span,
-.target-node span,
 .metric > span:first-child,
 .field > span {
   color: var(--muted);
@@ -645,18 +870,56 @@ button.window-button.close:hover {
 
 .combatant-spot strong {
   display: block;
-  margin-top: 8px;
-  font-size: clamp(20px, 2vw, 30px);
+  font-size: clamp(22px, 2.3vw, 34px);
 }
 
 .combatant-spot p {
-  margin-top: 8px;
   color: #c5d4e6;
   font-size: 13px;
 }
 
+.spot-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.spot-top .avatar {
+  width: 112px;
+  height: 132px;
+  border-radius: 8px;
+}
+
+.spot-top .avatar b {
+  font-size: 48px;
+}
+
+.spot-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 4px;
+}
+
+.spot-stats span {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 7px 8px;
+  color: var(--muted);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  font-size: 11px;
+}
+
+.spot-stats b {
+  color: var(--text);
+}
+
 .versus-core {
-  height: 118px;
+  height: 112px;
   display: grid;
   place-items: center;
   align-content: center;
@@ -679,50 +942,128 @@ button.window-button.close:hover {
   font-weight: 900;
 }
 
-.target-grid {
+.distance-strip {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 9px;
-  margin-top: 14px;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 7px;
+  margin-top: 10px;
 }
 
-.target-node {
-  min-height: 86px;
+.distance-strip button {
+  min-height: 48px;
   display: grid;
   align-content: center;
-  justify-items: start;
-  gap: 4px;
+  gap: 2px;
   color: var(--text);
   background: rgba(255, 255, 255, 0.045);
   border-color: rgba(255, 255, 255, 0.12);
-  text-align: left;
+  box-shadow: none;
 }
 
-.target-node small {
+.distance-strip strong {
+  font-size: 13px;
+}
+
+.distance-strip span {
   color: var(--muted);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
+  font-size: 11px;
 }
 
-.target-node.as-attacker {
+.distance-strip button.active {
   color: var(--cyan);
   border-color: rgba(39, 216, 255, 0.58);
   background: rgba(39, 216, 255, 0.08);
 }
 
-.target-node.as-defender {
-  color: #ff9bae;
-  border-color: rgba(255, 49, 93, 0.6);
-  background: rgba(255, 49, 93, 0.08);
+.battle-map {
+  position: relative;
+  min-height: 0;
+  margin-top: 10px;
+  border: 1px solid rgba(39, 216, 255, 0.18);
+  border-radius: 8px;
+  background:
+    linear-gradient(rgba(39, 216, 255, 0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(39, 216, 255, 0.05) 1px, transparent 1px),
+    radial-gradient(circle at 50% 45%, rgba(39, 216, 255, 0.12), transparent 34%),
+    rgba(3, 7, 13, 0.52);
+  background-size: 38px 38px, 38px 38px, auto, auto;
+  overflow: hidden;
 }
 
-.quick-pick {
+.battle-map::before,
+.attack-vector {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.battle-map::before {
+  inset: 10px;
+  border: 1px dashed rgba(39, 216, 255, 0.12);
+}
+
+.attack-vector {
+  left: var(--attacker-x);
+  top: var(--attacker-y);
+  width: calc(var(--defender-x) - var(--attacker-x));
+  height: calc(var(--defender-y) - var(--attacker-y));
+  border-top: 2px solid rgba(39, 216, 255, 0.82);
+  border-right: 2px solid rgba(255, 49, 93, 0.74);
+  filter: drop-shadow(0 0 10px rgba(39, 216, 255, 0.5));
+  transform-origin: 0 0;
+}
+
+.map-token {
+  position: absolute;
+  width: 54px;
+  height: 54px;
+  min-height: 54px;
+  padding: 0;
+  transform: translate(-50%, -50%);
+  border-radius: 8px;
+  color: var(--text);
+  border-color: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.055);
+  box-shadow: 0 0 18px rgba(0, 0, 0, 0.28);
+}
+
+.map-token .avatar {
+  width: 44px;
+  height: 44px;
+}
+
+.map-token .avatar b {
+  font-size: 18px;
+}
+
+.map-token > span {
+  position: absolute;
+  right: -4px;
+  bottom: -4px;
+  width: 18px;
+  height: 18px;
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-  margin-top: 14px;
+  place-items: center;
+  border-radius: 50%;
+  color: #061018;
+  background: var(--cyan);
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.map-token.as-attacker {
+  border-color: rgba(39, 216, 255, 0.72);
+  box-shadow: 0 0 24px rgba(39, 216, 255, 0.28);
+}
+
+.map-token.as-defender {
+  border-color: rgba(255, 49, 93, 0.72);
+  box-shadow: 0 0 24px rgba(255, 49, 93, 0.28);
+}
+
+.map-token.as-defender > span {
+  background: var(--red);
+  color: #fff;
 }
 
 .runner-card.attacker {
@@ -901,162 +1242,55 @@ button.window-button.close:hover {
 
 .control-grid {
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  margin-top: 14px;
+  margin-top: 10px;
 }
 
-.tactical-switchboard {
-  position: relative;
-  margin-top: 14px;
-  padding: 12px;
-  border: 1px solid rgba(39, 216, 255, 0.2);
-  border-radius: 8px;
-  background:
-    linear-gradient(120deg, rgba(39, 216, 255, 0.08), transparent 34%),
-    linear-gradient(300deg, rgba(255, 49, 93, 0.08), transparent 38%),
-    rgba(3, 7, 13, 0.48);
-  overflow: hidden;
+.ops-column .field {
+  gap: 4px;
 }
 
-.tactical-switchboard::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(90deg, transparent, rgba(39, 216, 255, 0.16), transparent);
-  opacity: 0.4;
+.ops-column .control-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
-.switchboard-head {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+.ops-column .field input,
+.ops-column .field select {
+  min-height: 32px;
+  padding: 6px 8px;
 }
 
-.switchboard-head span,
-.chip-section > span {
-  color: var(--muted);
+.ops-column .toggle-grid {
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.ops-column .check-field {
+  min-height: 30px;
+  padding: 6px 8px;
+  font-size: 12px;
+}
+
+.ops-column .rule-hints,
+.ops-column .rules-strip {
+  gap: 5px;
+  margin-top: 8px;
+}
+
+.ops-column .rule-hints span,
+.ops-column .rules-strip span {
+  min-height: 24px;
+  padding: 4px 7px;
   font-size: 11px;
-  font-weight: 900;
-  letter-spacing: 0;
 }
 
-.switchboard-head strong {
-  color: var(--cyan);
-  font-size: 14px;
+.ops-column .primary-actions {
+  margin-top: 10px;
 }
 
-.chip-section {
-  position: relative;
-  margin-top: 12px;
-}
-
-.chip-grid {
-  display: grid;
-  gap: 8px;
-  margin-top: 7px;
-}
-
-.attack-protocols {
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-}
-
-.weapon-protocols {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.terminal-chip,
-.distance-node,
-.hit-zone {
-  min-width: 0;
-  min-height: 58px;
-  display: grid;
-  align-content: center;
-  justify-items: start;
-  gap: 3px;
-  padding: 9px 10px;
-  color: var(--text);
-  text-align: left;
-  border: 1px solid rgba(255, 255, 255, 0.11);
-  border-radius: 7px;
-  background: rgba(255, 255, 255, 0.045);
-  box-shadow: none;
-}
-
-.terminal-chip:hover,
-.distance-node:hover,
-.hit-zone:hover {
-  transform: translateY(-1px);
-}
-
-.terminal-chip.active,
-.distance-node.active,
-.hit-zone.active {
-  color: var(--cyan);
-  border-color: rgba(39, 216, 255, 0.64);
-  background: rgba(39, 216, 255, 0.1);
-  box-shadow: inset 0 0 24px rgba(39, 216, 255, 0.08), 0 0 20px rgba(39, 216, 255, 0.12);
-}
-
-.terminal-chip.hot.active,
-.hit-zone.danger.active {
-  color: #ff9bae;
-  border-color: rgba(255, 49, 93, 0.62);
-  background: rgba(255, 49, 93, 0.1);
-  box-shadow: inset 0 0 24px rgba(255, 49, 93, 0.08), 0 0 20px rgba(255, 49, 93, 0.12);
-}
-
-.terminal-chip strong,
-.distance-node strong,
-.hit-zone strong {
-  max-width: 100%;
-  color: inherit;
-  font-size: 13px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.terminal-chip small,
-.distance-node small,
-.hit-zone small {
-  max-width: 100%;
-  color: var(--muted);
-  font-size: 11px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.terminal-chip:disabled,
-.distance-node:disabled,
-.hit-zone:disabled {
-  color: #516172;
-  opacity: 0.5;
-}
-
-.distance-rail {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 7px;
-}
-
-.hit-zone-panel {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.hit-zone span {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 900;
+.ops-column .primary-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .toggle-grid {
@@ -1370,9 +1604,6 @@ button.window-button.close:hover {
   .compact-grid.stats,
   .compact-grid.skills,
   .control-grid,
-  .attack-protocols,
-  .weapon-protocols,
-  .distance-rail,
   .formula-grid,
   .damage-ledger,
   .toggle-grid {
@@ -1413,13 +1644,9 @@ button.window-button.close:hover {
   .compact-grid.stats,
   .compact-grid.skills,
   .control-grid,
-  .attack-protocols,
-  .weapon-protocols,
-  .distance-rail,
   .formula-grid,
   .damage-ledger,
   .toggle-grid,
-  .hit-zone-panel,
   .target-grid {
     grid-template-columns: 1fr;
   }
