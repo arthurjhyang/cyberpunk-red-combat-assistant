@@ -784,6 +784,9 @@ function TacticalBoard({
 }) {
   const [nextPick, setNextPick] = useState("attacker");
   const [draggingToken, setDraggingToken] = useState(null);
+  const [mapDragActive, setMapDragActive] = useState(false);
+  const movedTokenRef = useRef(false);
+  const suppressClickRef = useRef("");
   const mapRef = useRef(null);
   const attackerPoint = positions[config.attacker] || null;
   const defenderPoint = positions[config.defender] || null;
@@ -814,6 +817,7 @@ function TacticalBoard({
 
   function handleMapDrop(event) {
     event.preventDefault();
+    setMapDragActive(false);
     const position = pointFromEvent(event);
     const file = event.dataTransfer.files?.[0];
     if (file) {
@@ -829,9 +833,17 @@ function TacticalBoard({
   useEffect(() => {
     if (!draggingToken) return;
     function handlePointerMove(event) {
+      movedTokenRef.current = true;
       onMove(draggingToken, pointFromEvent(event));
     }
     function handlePointerUp() {
+      if (movedTokenRef.current) {
+        suppressClickRef.current = draggingToken;
+        window.setTimeout(() => {
+          if (suppressClickRef.current === draggingToken) suppressClickRef.current = "";
+        }, 80);
+      }
+      movedTokenRef.current = false;
       setDraggingToken(null);
     }
     window.addEventListener("pointermove", handlePointerMove);
@@ -887,16 +899,23 @@ function TacticalBoard({
 
       <div
         ref={mapRef}
-        className={`battle-map ${stagedCombatants.length ? "" : "empty"}`}
+        className={`battle-map ${stagedCombatants.length ? "" : "empty"} ${mapDragActive ? "drop-active" : ""}`}
+        data-pick-mode={nextPick === "attacker" ? "攻击方" : "目标"}
+        onDragEnter={() => setMapDragActive(true)}
         onDragOver={event => {
           event.preventDefault();
           event.dataTransfer.dropEffect = "move";
+          setMapDragActive(true);
+        }}
+        onDragLeave={event => {
+          if (event.currentTarget === event.target) setMapDragActive(false);
         }}
         onDrop={handleMapDrop}
       >
         <div className="map-header">
           <span>战场态势</span>
           <strong>{distanceBands[num(config.distanceBand)]}</strong>
+          <em>点选: {nextPick === "attacker" ? "攻击方" : "目标"}</em>
         </div>
         {route && (
           <svg className="attack-route" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -919,17 +938,20 @@ function TacticalBoard({
           <button
             key={id}
             type="button"
-            draggable
-            className={`map-token ${config.attacker === id ? "as-attacker" : ""} ${config.defender === id ? "as-defender" : ""}`}
+            draggable={false}
+            className={`map-token ${config.attacker === id ? "as-attacker" : ""} ${config.defender === id ? "as-defender" : ""} ${draggingToken === id ? "is-dragging" : ""}`}
             style={{ left: `${point.x}%`, top: `${point.y}%` }}
-            onClick={() => pickToken(id)}
-            onDragStart={event => {
-              event.dataTransfer.effectAllowed = "move";
-              event.dataTransfer.setData("application/x-combatant-id", id);
-              event.dataTransfer.setData("text/plain", id);
+            onClick={event => {
+              event.stopPropagation();
+              if (suppressClickRef.current === id) return;
+              pickToken(id);
             }}
             onPointerDown={event => {
               if (event.button !== 0) return;
+              event.preventDefault();
+              event.stopPropagation();
+              event.currentTarget.setPointerCapture?.(event.pointerId);
+              movedTokenRef.current = false;
               setDraggingToken(id);
             }}
             onDoubleClick={event => {
@@ -938,8 +960,12 @@ function TacticalBoard({
             }}
           >
             <Avatar card={card} index={index} variant="token" />
-            <span>{index + 1}</span>
+            <span className="token-index">{index + 1}</span>
+            {(config.attacker === id || config.defender === id) && (
+              <strong className="token-role">{config.attacker === id ? "攻" : "目"}</strong>
+            )}
             <em>{card.name}</em>
+            <small>HP {card.hp}/{card.maxHp}</small>
           </button>
           );
         })}
@@ -984,7 +1010,7 @@ function CombatantSpot({ role, tone, card, id, emptyText }) {
           <span>WILL <b>{card.will}</b></span>
           <span>MOVE <b>{card.move}</b></span>
         </div>
-        <div className="spot-bars">
+        <div className="spot-bars compact">
           <div><span>HP</span><b>{card.hp}/{card.maxHp}</b><i style={{ width: `${hpPercent}%` }} /></div>
           <div><span>SP</span><b>身体 {card.bodySp} / 头部 {card.headSp}</b></div>
         </div>

@@ -7,30 +7,30 @@ const SHEET_CHARACTER = "人物卡";
 const SHEET_GEAR = "装备卡";
 
 const statCells = {
-  int: "P4",
-  ref: "P6",
-  dex: "P8",
-  tech: "P10",
-  cool: "P12",
-  will: "P14",
-  move: "P18",
-  body: "P20",
-  emp: "P22"
+  int: ["P4", "K4"],
+  ref: ["P6", "K6"],
+  dex: ["P8", "K8"],
+  tech: ["P10", "K10"],
+  cool: ["P12", "K12"],
+  will: ["P14", "K14"],
+  move: ["P18", "K18"],
+  body: ["P20", "K20"],
+  emp: ["P22", "K22"]
 };
 
 const skillBaseCells = {
-  brawling: ["AK3", "dex"],
-  evasion: ["AK4", "dex"],
-  martialArts: ["AK5", "dex"],
-  meleeWeapon: ["AK8", "dex"],
-  archery: ["AK10", "ref"],
-  autofire: ["AK11", "ref"],
-  handgun: ["AK12", "ref"],
-  heavyWeapons: ["AK13", "ref"],
-  shoulderArms: ["AK14", "ref"],
-  athletics: ["X11", "dex"],
-  concentration: ["X15", "will"],
-  firstAid: ["AK32", "tech"]
+  brawling: { base: ["AK3"], points: ["AJ3"], stat: "dex" },
+  evasion: { base: ["AK4"], points: ["AJ4"], stat: "dex" },
+  martialArts: { base: ["AK5"], points: ["AJ5"], stat: "dex" },
+  meleeWeapon: { base: ["AK8"], points: ["AJ8"], stat: "dex" },
+  archery: { base: ["AK10"], points: ["AJ10"], stat: "ref" },
+  autofire: { base: ["AK11"], points: ["AJ11"], stat: "ref" },
+  handgun: { base: ["AK12"], points: ["AJ12"], stat: "ref" },
+  heavyWeapons: { base: ["AK13"], points: ["AJ13"], stat: "ref" },
+  shoulderArms: { base: ["AK14"], points: ["AJ14"], stat: "ref" },
+  athletics: { base: ["X11"], points: ["W11"], stat: "dex" },
+  concentration: { base: ["X15", "X5"], points: ["W15", "W5"], stat: "will" },
+  firstAid: { base: ["AK32", "AK31"], points: ["AJ32", "AJ31"], stat: "tech" }
 };
 
 const writebackCells = {
@@ -126,18 +126,17 @@ export function extractCard(workbook, fileName = "") {
   }
 
   const stats = Object.fromEntries(
-    Object.entries(statCells).map(([key, cell]) => [key, num(cellValue(character[cell]))])
+    Object.entries(statCells).map(([key, cells]) => [key, firstNumber(character, cells)])
   );
   const skills = { ...blankSkills };
-  for (const [key, [cell, statKey]] of Object.entries(skillBaseCells)) {
-    const base = num(cellValue(character[cell]));
-    skills[key] = Math.max(0, base - num(stats[statKey]));
+  for (const [key, rule] of Object.entries(skillBaseCells)) {
+    skills[key] = readSkillLevel(character, rule, stats);
   }
 
   const hp = num(cellValue(character.K30));
   const maxHp = num(cellValue(character.O30)) || hp;
-  const headSp = gear ? num(cellValue(gear.AE5)) : num(cellValue(character.BA24));
-  const bodySp = gear ? num(cellValue(gear.AE9)) : num(cellValue(character.BA28));
+  const headSp = gear ? firstNumber(gear, ["AE5", "AE27"]) : firstNumber(character, ["BA24"]);
+  const bodySp = gear ? firstNumber(gear, ["AE9", "AE31"]) : firstNumber(character, ["BA28"]);
 
   return {
     name: textValue(character.D17) || fileName.replace(/\.xlsx$/i, ""),
@@ -222,6 +221,23 @@ function extractWeapons(gear) {
 
 function cellValue(cell) {
   return cell?.v ?? "";
+}
+
+function firstNumber(sheet, cells) {
+  for (const address of cells) {
+    const value = num(cellValue(sheet?.[address]));
+    if (value > 0) return value;
+  }
+  return 0;
+}
+
+function readSkillLevel(sheet, rule, stats) {
+  const base = firstNumber(sheet, rule.base);
+  const statValue = num(stats[rule.stat]);
+  if (base > statValue) return Math.max(0, base - statValue);
+  const points = firstNumber(sheet, rule.points);
+  if (points > 0) return points;
+  return base > 0 ? base : 0;
 }
 
 function textValue(cell) {
