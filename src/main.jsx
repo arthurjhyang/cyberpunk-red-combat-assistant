@@ -47,8 +47,8 @@ import {
 import "./styles.css";
 
 const initialConfig = {
-  attacker: "slot-1",
-  defender: "slot-2",
+  attacker: "",
+  defender: "",
   attackType: "ranged",
   weaponId: "mediumPistol",
   distanceBand: 0,
@@ -67,10 +67,11 @@ function blankSources(cards) {
 
 function App() {
   const isDesktopApp = Boolean(window.electronWindow);
-  const [cards, setCards] = useState(sampleCards);
-  const [sources, setSources] = useState(() => blankSources(sampleCards));
+  const [cards, setCards] = useState({});
+  const [sources, setSources] = useState({});
+  const [battlePositions, setBattlePositions] = useState({});
   const [config, setConfig] = useState(initialConfig);
-  const [selectedCardId, setSelectedCardId] = useState(initialConfig.attacker);
+  const [selectedCardId, setSelectedCardId] = useState("");
   const [result, setResult] = useState(null);
   const [log, setLog] = useState([]);
   const [toast, setToast] = useState("");
@@ -79,10 +80,14 @@ function App() {
   const [activeView, setActiveView] = useState("combat");
 
   const combatants = useMemo(() => Object.entries(cards).map(([id, card], index) => ({ id, card, index })), [cards]);
+  const stagedCombatants = useMemo(
+    () => combatants.filter(({ id }) => battlePositions[id]),
+    [combatants, battlePositions]
+  );
   const mode = selectedMode(config);
   const attacker = cards[config.attacker];
   const defender = cards[config.defender];
-  const selectedCard = cards[selectedCardId] || attacker;
+  const selectedCard = cards[selectedCardId] || attacker || combatants[0]?.card || createBlankCard();
   const selectedSource = sources[selectedCardId] || null;
   const threat = useMemo(() => estimateThreat(cards, config), [cards, config]);
 
@@ -103,34 +108,44 @@ function App() {
     });
   }
 
-  async function importFile(id, file, handle = null) {
+  async function importFile(id, file, handle = null, position = null) {
     if (!file) return;
     try {
       const source = await readWorkbookFile(file, handle);
-      setCards(prev => ({ ...prev, [id]: source.card }));
-      setSources(prev => ({ ...prev, [id]: source }));
-      setSelectedCardId(id);
-      pushLog(`导入 ${slotLabel(id)}：${source.card.name}（${file.name}）`);
-      setToast(`${slotLabel(id)} 已读取：${source.card.name}`);
+      const targetId = id || nextSlotId(cards);
+      setCards(prev => ({ ...prev, [targetId]: source.card }));
+      setSources(prev => ({ ...prev, [targetId]: source }));
+      if (position) {
+        setBattlePositions(prev => ({ ...prev, [targetId]: position }));
+        setConfig(prev => nextConfigAfterStage(prev, targetId));
+      }
+      setSelectedCardId(targetId);
+      pushLog(`导入 ${slotLabel(targetId)}：${source.card.name}（${file.name}）`);
+      setToast(`${slotLabel(targetId)} 已读取：${source.card.name}`);
     } catch (error) {
       setToast(error.message);
     }
   }
 
-  async function openWithPicker(id) {
+  async function openWithPicker(id = "") {
     try {
       const source = await openWorkbookWithPicker();
-      setCards(prev => ({ ...prev, [id]: source.card }));
-      setSources(prev => ({ ...prev, [id]: source }));
-      setSelectedCardId(id);
-      pushLog(`授权打开 ${slotLabel(id)}：${source.card.name}`);
-      setToast(`${slotLabel(id)} 已授权，可直接保存回原文件`);
+      const targetId = id || nextSlotId(cards);
+      setCards(prev => ({ ...prev, [targetId]: source.card }));
+      setSources(prev => ({ ...prev, [targetId]: source }));
+      setSelectedCardId(targetId);
+      pushLog(`授权打开 ${slotLabel(targetId)}：${source.card.name}`);
+      setToast(`${slotLabel(targetId)} 已授权，可直接保存回原文件`);
     } catch (error) {
       setToast(error.message);
     }
   }
 
   function resolve(baseOnly = false) {
+    if (!attacker || !defender) {
+      setToast("先把至少两张角色卡拖进战场，并指定攻击方与目标。");
+      return;
+    }
     if (config.attacker === config.defender) {
       setToast("攻击方和防守方不能是同一个战斗人员。");
       return;
@@ -204,12 +219,12 @@ function App() {
   }
 
   function setAttacker(id) {
-    setConfig(prev => ({ ...prev, attacker: id, defender: prev.defender === id ? firstOtherId(cards, id) : prev.defender }));
+    setConfig(prev => ({ ...prev, attacker: id, defender: prev.defender === id ? firstOtherStagedId(battlePositions, id) : prev.defender }));
     setSelectedCardId(id);
   }
 
   function setDefender(id) {
-    setConfig(prev => ({ ...prev, defender: id, attacker: prev.attacker === id ? firstOtherId(cards, id) : prev.attacker }));
+    setConfig(prev => ({ ...prev, defender: id, attacker: prev.attacker === id ? firstOtherStagedId(battlePositions, id) : prev.attacker }));
     setSelectedCardId(id);
   }
 
@@ -219,10 +234,7 @@ function App() {
   }
 
   function addCombatant() {
-    const usedNumbers = Object.keys(cards)
-      .map(id => Number(String(id).match(/(\d+)$/)?.[1]))
-      .filter(Number.isFinite);
-    const nextIndex = Math.max(0, ...usedNumbers) + 1;
+    const nextIndex = nextSlotNumber(cards);
     const id = `slot-${nextIndex}`;
     setCards(prev => ({ ...prev, [id]: createBlankCard(nextIndex) }));
     setSources(prev => ({ ...prev, [id]: null }));
@@ -233,15 +245,11 @@ function App() {
   function removeCombatant(id) {
     if (!cards[id]) return;
     const ids = Object.keys(cards);
-    if (ids.length <= 2) {
-      setToast("至少保留 2 名战斗人员用于攻防结算。");
-      return;
-    }
     const removed = cards[id];
     const remaining = ids.filter(item => item !== id);
-    const nextAttacker = config.attacker === id ? remaining[0] : config.attacker;
+    const nextAttacker = config.attacker === id ? firstStagedIdWithout(battlePositions, id) : config.attacker;
     const nextDefender = config.defender === id
-      ? remaining.find(item => item !== nextAttacker) || remaining[0]
+      ? firstStagedIdWithout(battlePositions, id, nextAttacker)
       : config.defender;
     setCards(prev => {
       const next = { ...prev };
@@ -253,21 +261,65 @@ function App() {
       delete next[id];
       return next;
     });
+    setBattlePositions(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
     setConfig(prev => ({ ...prev, attacker: nextAttacker, defender: nextDefender }));
-    setSelectedCardId(prev => (prev === id ? nextAttacker : prev));
+    setSelectedCardId(prev => (prev === id ? remaining[0] || "" : prev));
     setResult(null);
     setLastSnapshot(null);
     pushLog(`移除 ${slotLabel(id)}：${removed.name || "未命名角色"}。`);
   }
 
   function resetDemo() {
-    setCards(sampleCards);
-    setSources(blankSources(sampleCards));
+    setCards({});
+    setSources({});
+    setBattlePositions({});
     setConfig(initialConfig);
-    setSelectedCardId(initialConfig.attacker);
+    setSelectedCardId("");
     setResult(null);
     setLog([]);
     setLastSnapshot(null);
+  }
+
+  function loadDemo() {
+    setCards(sampleCards);
+    setSources(blankSources(sampleCards));
+    setBattlePositions({
+      "slot-1": { x: 23, y: 32 },
+      "slot-2": { x: 76, y: 36 }
+    });
+    setConfig(prev => ({ ...prev, attacker: "slot-1", defender: "slot-2" }));
+    setSelectedCardId("slot-1");
+    setResult(null);
+    setLog([]);
+    setLastSnapshot(null);
+  }
+
+  function stageCombatant(id, position) {
+    if (!cards[id]) return;
+    setBattlePositions(prev => ({ ...prev, [id]: position }));
+    setConfig(prev => nextConfigAfterStage(prev, id));
+    setSelectedCardId(id);
+  }
+
+  function moveStagedCombatant(id, position) {
+    setBattlePositions(prev => ({ ...prev, [id]: position }));
+  }
+
+  function unstageCombatant(id) {
+    setBattlePositions(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setConfig(prev => ({
+      ...prev,
+      attacker: prev.attacker === id ? firstStagedIdWithout(battlePositions, id) : prev.attacker,
+      defender: prev.defender === id ? firstStagedIdWithout(battlePositions, id, prev.attacker) : prev.defender
+    }));
   }
 
   function pushLog(text) {
@@ -302,12 +354,16 @@ function App() {
             onOpenPicker={openWithPicker}
             onAdd={addCombatant}
             onRemove={removeCombatant}
+            onLoadDemo={loadDemo}
+            onStageQuick={id => stageCombatant(id, defaultStagePosition(Object.keys(battlePositions).length))}
           />
 
           <section className="combat-stage">
             <TacticalBoard
               combatants={combatants}
+              stagedCombatants={stagedCombatants}
               cards={cards}
+              positions={battlePositions}
               config={config}
               attacker={attacker}
               defender={defender}
@@ -317,12 +373,17 @@ function App() {
               onSetDefender={setDefender}
               onConfigChange={setConfig}
               onSwap={swapSides}
+              onStage={stageCombatant}
+              onMove={moveStagedCombatant}
+              onImportToStage={(file, position) => importFile("", file, null, position)}
+              onUnstage={unstageCombatant}
             />
           </section>
 
           <aside className="ops-column">
             <CombatConsole
               combatants={combatants}
+              stagedCombatants={stagedCombatants}
               config={config}
               setConfig={setConfig}
               mode={mode}
@@ -332,6 +393,7 @@ function App() {
               onUndo={undoDamage}
               onSwap={swapSides}
               onReset={resetDemo}
+              onLoadDemo={loadDemo}
             />
             <ResultPanel result={result} config={config} onFillBack={fillBackResult} />
             <LogPanel log={log} onClear={() => setLog([])} />
@@ -355,8 +417,10 @@ function App() {
               onOpenPicker={openWithPicker}
               onAdd={addCombatant}
               onRemove={removeCombatant}
+              onLoadDemo={loadDemo}
+              onStageQuick={id => stageCombatant(id, defaultStagePosition(Object.keys(battlePositions).length))}
             />
-            <CharacterPanel
+            {selectedCardId ? <CharacterPanel
               id={selectedCardId}
               card={selectedCard}
               source={selectedSource}
@@ -366,8 +430,8 @@ function App() {
               onSaveDirect={saveDirect}
               onChange={patchCard}
               onRemove={removeCombatant}
-              canRemove={combatants.length > 2}
-            />
+              canRemove={combatants.length > 0}
+            /> : <EmptyCharacterPanel onAdd={addCombatant} onOpenPicker={() => openWithPicker("")} />}
           </section>
         )}
 
@@ -504,34 +568,47 @@ function RosterPanel({
   onDropFile,
   onOpenPicker,
   onAdd,
-  onRemove
+  onRemove,
+  onLoadDemo,
+  onStageQuick
 }) {
   const [compact, setCompact] = useState(false);
+  const fileInputRef = useRef(null);
 
   function handleDockDrop(event) {
     event.preventDefault();
     onDragSide(null);
-    onDropFile(selectedCardId, event.dataTransfer.files?.[0]);
+    onDropFile("", event.dataTransfer.files?.[0]);
   }
 
   return (
     <aside className={`roster-panel ${compact ? "compact" : ""}`}>
       <div className="panel-heading">
         <div>
-          <h2>战斗人员 <span>{combatants.length}/12</span></h2>
-          <p>点击卡位编辑，攻/目按钮指定当前对决。</p>
+          <h2>角色卡库 <span>{combatants.length}/12</span></h2>
+          <p>导入角色卡后，拖到中间战场自由摆位。</p>
         </div>
         <div className="panel-tools">
+          <input
+            ref={fileInputRef}
+            className="file-input"
+            type="file"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            onChange={event => onDropFile("", event.target.files?.[0])}
+          />
           <button type="button" className="icon-button secondary" onClick={() => setCompact(prev => !prev)} title="切换列表密度">
             <ClipboardList size={16} />
           </button>
-          <button type="button" className="icon-button" onClick={onAdd} title="新增卡位">
-            <Plus size={17} />
+          <button type="button" className="icon-button secondary" onClick={onLoadDemo} title="载入演示角色">
+            <Users size={16} />
+          </button>
+          <button type="button" className="icon-button" onClick={() => fileInputRef.current?.click()} title="导入角色卡">
+            <UploadCloud size={17} />
           </button>
         </div>
       </div>
       <div className="roster-list">
-        {combatants.map(({ id, card, index }) => (
+        {combatants.length ? combatants.map(({ id, card, index }) => (
           <RosterCard
             key={id}
             id={id}
@@ -548,23 +625,27 @@ function RosterPanel({
             onDropFile={onDropFile}
             onOpenPicker={onOpenPicker}
             onRemove={onRemove}
-            canRemove={combatants.length > 2}
+            onStageQuick={onStageQuick}
+            canRemove={combatants.length > 0}
           />
-        ))}
+        )) : (
+          <div className="roster-empty">
+            <UploadCloud size={26} />
+            <strong>还没有角色卡</strong>
+            <span>拖拽自动卡到下方导入坞，或点击右上角导入。导入后再拖进中间战场。</span>
+          </div>
+        )}
       </div>
       <div
         className="roster-import-dock"
-        onDragOver={event => {
-          event.preventDefault();
-          onDragSide(selectedCardId);
-        }}
+        onDragOver={event => event.preventDefault()}
         onDragLeave={() => onDragSide(null)}
         onDrop={handleDockDrop}
       >
         <UploadCloud size={22} />
         <div>
           <strong>拖拽 .xlsx 自动卡到此处导入</strong>
-          <span>写入当前选中卡位 · 支持鲨鱼包 / 芬里尔 1.7+</span>
+          <span>导入后出现在卡库，可继续拖到战场自由摆放</span>
         </div>
       </div>
     </aside>
@@ -586,6 +667,7 @@ function RosterCard({
   onDropFile,
   onOpenPicker,
   onRemove,
+  onStageQuick,
   canRemove
 }) {
   const fileInputRef = useRef(null);
@@ -601,7 +683,13 @@ function RosterCard({
   return (
     <article
       className={`roster-card ${selected ? "selected" : ""} ${role} ${dragging ? "dragging" : ""}`}
+      draggable
       onClick={() => onSelect(id)}
+      onDragStart={event => {
+        event.dataTransfer.effectAllowed = "copyMove";
+        event.dataTransfer.setData("application/x-combatant-id", id);
+        event.dataTransfer.setData("text/plain", id);
+      }}
       onDragOver={event => {
         event.preventDefault();
         onDragSide(id);
@@ -614,7 +702,12 @@ function RosterCard({
       <div className="roster-main">
         <div className="roster-title">
           <strong>{card.name || slotLabel(id)}</strong>
-          <span className={`role-light ${role || wound.tone}`}>{role ? (role === "attacker" ? "攻击" : "目标") : wound.label}</span>
+          <div className="roster-title-actions" onClick={event => event.stopPropagation()}>
+            <span className={`role-light ${role || wound.tone}`}>{role ? (role === "attacker" ? "攻击" : "目标") : wound.label}</span>
+            <button type="button" className="deploy-chip" onClick={() => onStageQuick(id)} title="部署到战场">
+              <Crosshair size={12} />
+            </button>
+          </div>
         </div>
         <p>{source?.fileName || card.alias || "拖拽 xlsx 到此卡位"}</p>
         <div className="roster-vitals">
@@ -639,12 +732,6 @@ function RosterCard({
           <button type="button" className="ghost-button" onClick={() => onOpenPicker(id)} title="授权打开">
             <FolderOpen size={14} />
           </button>
-          <button type="button" className="ghost-button cyan" onClick={() => onSetAttacker(id)}>
-            攻
-          </button>
-          <button type="button" className="ghost-button red" onClick={() => onSetDefender(id)}>
-            目
-          </button>
           <button type="button" className="ghost-button" onClick={() => onSelect(id)} title="编辑卡位">
             <Edit3 size={13} />
           </button>
@@ -659,20 +746,41 @@ function RosterCard({
 
 function Avatar({ card, index = 0, variant = "" }) {
   const initial = String(card?.name || "?").trim().slice(0, 1).toUpperCase() || "?";
+  const image = card?.avatar || defaultAvatar(index, initial);
   return (
-    <span className={`avatar ${variant ? `avatar-${variant}` : ""}`} style={{ "--avatar-hue": (index * 47 + 190) % 360 }}>
-      {card?.avatar ? <img src={card.avatar} alt="" /> : <b>{initial}</b>}
+    <span
+      className={`avatar has-image ${variant ? `avatar-${variant}` : ""}`}
+      style={{ "--avatar-hue": (index * 47 + 190) % 360, "--avatar-seed": index % 4 }}
+    >
+      <img src={image} alt="" />
     </span>
   );
 }
 
-function TacticalBoard({ combatants, config, attacker, defender, threat, mode, onSetAttacker, onSetDefender, onConfigChange, onSwap }) {
+function TacticalBoard({
+  combatants,
+  stagedCombatants,
+  positions,
+  config,
+  attacker,
+  defender,
+  threat,
+  mode,
+  onSetAttacker,
+  onSetDefender,
+  onConfigChange,
+  onSwap,
+  onStage,
+  onMove,
+  onImportToStage,
+  onUnstage
+}) {
   const [nextPick, setNextPick] = useState("attacker");
-  const attackerIndex = combatants.findIndex(item => item.id === config.attacker);
-  const defenderIndex = combatants.findIndex(item => item.id === config.defender);
-  const attackerPoint = mapPoint(attackerIndex < 0 ? 0 : attackerIndex);
-  const defenderPoint = mapPoint(defenderIndex < 0 ? 1 : defenderIndex);
-  const route = routePath(attackerPoint, defenderPoint);
+  const [draggingToken, setDraggingToken] = useState(null);
+  const mapRef = useRef(null);
+  const attackerPoint = positions[config.attacker] || null;
+  const defenderPoint = positions[config.defender] || null;
+  const route = attackerPoint && defenderPoint ? routePath(attackerPoint, defenderPoint) : "";
 
   function pickToken(id) {
     if (nextPick === "attacker") {
@@ -688,12 +796,51 @@ function TacticalBoard({ combatants, config, attacker, defender, threat, mode, o
     onConfigChange(prev => ({ ...prev, distanceBand }));
   }
 
+  function pointFromEvent(event) {
+    const rect = mapRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 50, y: 50 };
+    return {
+      x: clampPercent(((event.clientX - rect.left) / rect.width) * 100),
+      y: clampPercent(((event.clientY - rect.top) / rect.height) * 100)
+    };
+  }
+
+  function handleMapDrop(event) {
+    event.preventDefault();
+    const position = pointFromEvent(event);
+    const file = event.dataTransfer.files?.[0];
+    if (file) {
+      onImportToStage(file, position);
+      return;
+    }
+    const id = event.dataTransfer.getData("application/x-combatant-id") || event.dataTransfer.getData("text/plain");
+    if (!id) return;
+    if (positions[id]) onMove(id, position);
+    else onStage(id, position);
+  }
+
+  useEffect(() => {
+    if (!draggingToken) return;
+    function handlePointerMove(event) {
+      onMove(draggingToken, pointFromEvent(event));
+    }
+    function handlePointerUp() {
+      setDraggingToken(null);
+    }
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", handlePointerUp, { once: true });
+    return () => {
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", handlePointerUp);
+    };
+  }, [draggingToken, onMove]);
+
   return (
     <article className="tactical-board">
       <div className="panel-heading">
         <div>
-          <h2>当前对决</h2>
-          <p>点击战场头像牌：下一次指定{nextPick === "attacker" ? "攻击方" : "目标"}。</p>
+          <h2>自由战场</h2>
+          <p>拖入角色卡或 .xlsx 后自由摆位；点击头像牌指定{nextPick === "attacker" ? "攻击方" : "目标"}。</p>
         </div>
         <button type="button" className="icon-button" onClick={onSwap} title="交换攻防">
           <ArrowLeftRight size={17} />
@@ -701,13 +848,13 @@ function TacticalBoard({ combatants, config, attacker, defender, threat, mode, o
       </div>
 
       <div className="duel-lane">
-        <CombatantSpot role="攻击方" tone="cyan" card={attacker} id={config.attacker} />
+        <CombatantSpot role="攻击方" tone="cyan" card={attacker} id={config.attacker} emptyText="把攻击方拖进战场后点击头像牌" />
         <div className="versus-core">
           <Radar size={26} />
           <strong>VS</strong>
-          <span className={threat.tone}>{threat.label}</span>
+          <span className={attacker && defender ? threat.tone : ""}>{attacker && defender ? threat.label : "待部署"}</span>
         </div>
-        <CombatantSpot role="目标" tone="red" card={defender} id={config.defender} />
+        <CombatantSpot role="目标" tone="red" card={defender} id={config.defender} emptyText="把目标拖进战场后点击头像牌" />
       </div>
 
       <div className="distance-strip">
@@ -731,31 +878,57 @@ function TacticalBoard({ combatants, config, attacker, defender, threat, mode, o
         })}
       </div>
 
-      <div className="battle-map" style={{
-        "--attacker-x": `${attackerPoint.x}%`,
-        "--attacker-y": `${attackerPoint.y}%`,
-        "--defender-x": `${defenderPoint.x}%`,
-        "--defender-y": `${defenderPoint.y}%`
-      }}>
+      <div
+        ref={mapRef}
+        className={`battle-map ${stagedCombatants.length ? "" : "empty"}`}
+        onDragOver={event => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "move";
+        }}
+        onDrop={handleMapDrop}
+      >
         <div className="map-header">
           <span>战场态势</span>
           <strong>{distanceBands[num(config.distanceBand)]}</strong>
         </div>
-        <svg className="attack-route" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-          <path className="route-shadow" d={route} />
-          <path className="route-cyan" d={route} />
-          <circle className="route-start" cx={attackerPoint.x} cy={attackerPoint.y} r="1.8" />
-          <circle className="route-end" cx={defenderPoint.x} cy={defenderPoint.y} r="2.1" />
-        </svg>
-        {combatants.map(({ id, card, index }) => {
-          const point = mapPoint(index);
+        {route && (
+          <svg className="attack-route" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <path className="route-shadow" d={route} />
+            <path className="route-cyan" d={route} />
+            <circle className="route-start" cx={attackerPoint.x} cy={attackerPoint.y} r="1.8" />
+            <circle className="route-end" cx={defenderPoint.x} cy={defenderPoint.y} r="2.1" />
+          </svg>
+        )}
+        {!stagedCombatants.length && (
+          <div className="battle-drop-empty">
+            <UploadCloud size={30} />
+            <strong>拖入角色卡开始布阵</strong>
+            <span>支持从左侧卡库拖入，也支持直接拖入 .xlsx 自动卡。</span>
+          </div>
+        )}
+        {stagedCombatants.map(({ id, card, index }) => {
+          const point = positions[id] || { x: 50, y: 50 };
           return (
           <button
             key={id}
             type="button"
+            draggable
             className={`map-token ${config.attacker === id ? "as-attacker" : ""} ${config.defender === id ? "as-defender" : ""}`}
             style={{ left: `${point.x}%`, top: `${point.y}%` }}
             onClick={() => pickToken(id)}
+            onDragStart={event => {
+              event.dataTransfer.effectAllowed = "move";
+              event.dataTransfer.setData("application/x-combatant-id", id);
+              event.dataTransfer.setData("text/plain", id);
+            }}
+            onPointerDown={event => {
+              if (event.button !== 0) return;
+              setDraggingToken(id);
+            }}
+            onDoubleClick={event => {
+              event.stopPropagation();
+              onUnstage(id);
+            }}
           >
             <Avatar card={card} index={index} variant="token" />
             <span>{index + 1}</span>
@@ -768,7 +941,22 @@ function TacticalBoard({ combatants, config, attacker, defender, threat, mode, o
   );
 }
 
-function CombatantSpot({ role, tone, card, id }) {
+function CombatantSpot({ role, tone, card, id, emptyText }) {
+  if (!card) {
+    return (
+      <div className={`combatant-spot ${tone} empty-spot`}>
+        <div className="spot-frame empty-portrait">
+          <Crosshair size={34} />
+          <span>{role}</span>
+        </div>
+        <div className="spot-data">
+          <span>{role}</span>
+          <strong>等待部署</strong>
+          <p>{emptyText || "拖入角色卡后选择攻防对象"}</p>
+        </div>
+      </div>
+    );
+  }
   const wound = woundState(card);
   const hpPercent = Math.max(0, Math.min(100, (num(card.hp) / Math.max(1, num(card.maxHp))) * 100));
   return (
@@ -888,10 +1076,40 @@ function CharacterPanel({ id, card, source, active, onDropFile, onOpenPicker, on
   );
 }
 
-function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseOnly, onFillBack, onUndo, onSwap, onReset }) {
+function EmptyCharacterPanel({ onAdd, onOpenPicker }) {
+  return (
+    <article className="runner-card empty-editor">
+      <div className="panel-top">
+        <div>
+          <span className="side-chip">卡库</span>
+          <h2>等待角色卡</h2>
+          <p>导入或新增角色后，这里会显示可编辑属性。</p>
+        </div>
+      </div>
+      <div className="drop-zone">
+        <UploadCloud size={20} />
+        <span>战斗页也支持把 .xlsx 直接拖到中间战场。</span>
+        <small>导入卡片后，再拖进战场进行自由摆位和攻防选择。</small>
+      </div>
+      <div className="button-row">
+        <button type="button" onClick={onOpenPicker}>
+          <FolderOpen size={16} />
+          授权打开角色卡
+        </button>
+        <button type="button" className="secondary" onClick={onAdd}>
+          <Plus size={16} />
+          新增手动卡
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function CombatConsole({ combatants, stagedCombatants, config, setConfig, mode, onResolve, onBaseOnly, onFillBack, onUndo, onSwap, onReset, onLoadDemo }) {
   const attackType = attackModes[config.attackType] ? config.attackType : "ranged";
   const weapons = attackModes[attackType].weapons;
   const isAreaAttack = Boolean(attackModes[attackType].area || mode.weapon.area);
+  const selectableCombatants = stagedCombatants;
 
   function update(patch) {
     setConfig(prev => {
@@ -900,8 +1118,8 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
       const nextWeapon = nextAttack.weapons.find(item => item.id === next.weaponId) || nextAttack.weapons[0];
       if (nextAttack.area || nextWeapon.area) next.targetPart = "body";
       if (next.attacker === next.defender) {
-        if (patch.attacker) next.defender = firstOtherId(Object.fromEntries(combatants.map(({ id, card }) => [id, card])), patch.attacker);
-        if (patch.defender) next.attacker = firstOtherId(Object.fromEntries(combatants.map(({ id, card }) => [id, card])), patch.defender);
+        if (patch.attacker) next.defender = firstOtherId(Object.fromEntries(selectableCombatants.map(({ id, card }) => [id, card])), patch.attacker);
+        if (patch.defender) next.attacker = firstOtherId(Object.fromEntries(selectableCombatants.map(({ id, card }) => [id, card])), patch.defender);
       }
       return next;
     });
@@ -921,14 +1139,16 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
 
       <div className="control-grid">
         <SelectField label="攻击方" value={config.attacker} onChange={attacker => update({ attacker })}>
-          {combatants.map(({ id, card }) => (
+          <option value="">未选择</option>
+          {selectableCombatants.map(({ id, card }) => (
             <option key={id} value={id}>
               {slotLabel(id)} · {card.name}
             </option>
           ))}
         </SelectField>
         <SelectField label="防守方" value={config.defender} onChange={defender => update({ defender })}>
-          {combatants.map(({ id, card }) => (
+          <option value="">未选择</option>
+          {selectableCombatants.map(({ id, card }) => (
             <option key={id} value={id}>
               {slotLabel(id)} · {card.name}
             </option>
@@ -991,7 +1211,11 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
         </button>
         <button type="button" className="secondary danger-text" onClick={onReset}>
           <RotateCcw size={16} />
-          重置演示
+          清空
+        </button>
+        <button type="button" className="secondary" onClick={onLoadDemo}>
+          <Users size={16} />
+          演示
         </button>
       </div>
     </article>
@@ -1277,6 +1501,98 @@ function slotLabel(id) {
 
 function firstOtherId(cards, currentId) {
   return Object.keys(cards).find(id => id !== currentId) || currentId;
+}
+
+function firstOtherStagedId(positions, currentId) {
+  return Object.keys(positions).find(id => id !== currentId) || "";
+}
+
+function firstStagedIdWithout(positions, removedId, exceptId = "") {
+  return Object.keys(positions).find(id => id !== removedId && id !== exceptId) || "";
+}
+
+function nextConfigAfterStage(config, id) {
+  if (!config.attacker) return { ...config, attacker: id };
+  if (!config.defender && config.attacker !== id) return { ...config, defender: id };
+  return config;
+}
+
+function nextSlotNumber(cards) {
+  const usedNumbers = Object.keys(cards)
+    .map(id => Number(String(id).match(/(\d+)$/)?.[1]))
+    .filter(Number.isFinite);
+  return Math.max(0, ...usedNumbers) + 1;
+}
+
+function nextSlotId(cards) {
+  return `slot-${nextSlotNumber(cards)}`;
+}
+
+function clampPercent(value) {
+  return Math.max(6, Math.min(94, value));
+}
+
+function defaultStagePosition(index) {
+  const positions = [
+    { x: 24, y: 34 },
+    { x: 74, y: 36 },
+    { x: 40, y: 64 },
+    { x: 58, y: 58 },
+    { x: 28, y: 72 },
+    { x: 82, y: 66 },
+    { x: 18, y: 52 },
+    { x: 68, y: 78 }
+  ];
+  return positions[index % positions.length];
+}
+
+function defaultAvatar(index, initial) {
+  const palettes = [
+    ["#22d8ff", "#ff315d", "#08121d"],
+    ["#54ff9b", "#27d8ff", "#07131a"],
+    ["#ffd166", "#ff315d", "#120b17"],
+    ["#a78bfa", "#27d8ff", "#090d18"]
+  ];
+  const [a, b, bg] = palettes[index % palettes.length];
+  const implant = index % 2 === 0
+    ? `<path d="M126 58h24v64h-15v-42h-9z" fill="${a}" opacity=".9"/>`
+    : `<path d="M38 70h22v80H45v-52H34z" fill="${b}" opacity=".8"/>`;
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 220">
+      <defs>
+        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+          <stop stop-color="${a}"/>
+          <stop offset=".58" stop-color="${b}"/>
+          <stop offset="1" stop-color="${bg}"/>
+        </linearGradient>
+        <radialGradient id="r" cx=".5" cy=".28" r=".72">
+          <stop stop-color="#ffffff" stop-opacity=".28"/>
+          <stop offset=".42" stop-color="${a}" stop-opacity=".16"/>
+          <stop offset="1" stop-color="#000000" stop-opacity=".72"/>
+        </radialGradient>
+      </defs>
+      <path d="M0 22 22 0h158v198l-22 22H0z" fill="${bg}"/>
+      <path d="M0 22 22 0h158v198l-22 22H0z" fill="url(#g)" opacity=".72"/>
+      <path d="M0 0h180v220H0z" fill="url(#r)"/>
+      <path d="M47 201c5-45 22-66 43-66s38 21 43 66z" fill="#07101a" opacity=".9"/>
+      <path d="M58 84c0-35 18-56 40-56 23 0 38 22 38 57 0 42-16 72-39 72-24 0-39-31-39-73z" fill="#0d1722"/>
+      <path d="M65 96h70" stroke="${a}" stroke-width="7" stroke-linecap="square" opacity=".88"/>
+      <path d="M72 63c12-21 37-28 62-6" stroke="#fff" stroke-opacity=".18" stroke-width="10" stroke-linecap="round"/>
+      ${implant}
+      <text x="90" y="182" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="42" font-weight="900" fill="#f4f8ff">${escapeSvg(initial)}</text>
+      <path d="M10 34V12h26M170 186v22h-26" fill="none" stroke="${a}" stroke-width="3" opacity=".85"/>
+    </svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+}
+
+function escapeSvg(text) {
+  return String(text).replace(/[&<>"']/g, char => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    "\"": "&quot;",
+    "'": "&apos;"
+  }[char]));
 }
 
 function mapPoint(index) {
