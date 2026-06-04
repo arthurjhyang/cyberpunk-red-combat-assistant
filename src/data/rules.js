@@ -67,8 +67,8 @@ export const attackModes = {
       { id: "assaultRifle", label: "突击步枪", family: "assaultRifle", skill: "shoulderArms", damage: "5d6", rof: 1 },
       { id: "sniperRifle", label: "狙击步枪", family: "sniperRifle", skill: "shoulderArms", damage: "5d6", rof: 1 },
       { id: "bow", label: "弓/十字弩", family: "bow", skill: "archery", damage: "4d6", rof: 1 },
-      { id: "grenadeLauncher", label: "榴弹发射器", family: "grenadeLauncher", skill: "heavyWeapons", damage: "6d6", rof: 1 },
-      { id: "rocketLauncher", label: "火箭筒", family: "rocketLauncher", skill: "heavyWeapons", damage: "8d6", rof: 1 }
+      { id: "grenadeLauncher", label: "榴弹发射器", family: "grenadeLauncher", skill: "heavyWeapons", damage: "6d6", rof: 1, area: true },
+      { id: "rocketLauncher", label: "火箭筒", family: "rocketLauncher", skill: "heavyWeapons", damage: "8d6", rof: 1, area: true }
     ]
   },
   autofire: {
@@ -85,8 +85,9 @@ export const attackModes = {
     stat: "ref",
     defender: "dv",
     fixedDv: 13,
+    area: true,
     weapons: [
-      { id: "shotgunShell", label: "霰弹枪霰弹", family: "shotgun", skill: "shoulderArms", damage: "3d6", rof: 1 }
+      { id: "shotgunShell", label: "霰弹枪霰弹", family: "shotgun", skill: "shoulderArms", damage: "3d6", rof: 1, area: true }
     ]
   },
   melee: {

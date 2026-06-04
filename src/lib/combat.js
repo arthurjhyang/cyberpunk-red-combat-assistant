@@ -75,7 +75,10 @@ export function resolveCombat(cards, config) {
   const attacker = cards[config.attacker];
   const defender = cards[config.defender];
   const { attack, weapon } = selectedMode(config);
-  const aimedPenalty = config.aimed ? -8 : 0;
+  const isAreaAttack = Boolean(attack.area || weapon.area);
+  const targetPart = isAreaAttack ? "body" : config.targetPart;
+  const isHeadShot = targetPart === "head";
+  const aimedPenalty = config.aimed || isHeadShot ? -8 : 0;
   const modifier = num(config.modifier) + aimedPenalty;
   const attackBase = baseFor(attacker, attack.stat, weapon.skill);
   const useDodge =
@@ -100,14 +103,24 @@ export function resolveCombat(cards, config) {
   const hit = attackTotal > targetTotal;
   const damageExpr = attack.bodyDamage ? bodyDamageDice(attacker.body) : weapon.damage;
 
-  let damage = { rolls: [], total: 0, crit: false, expr: damageExpr };
+  let damage = { rolls: [], total: 0, baseTotal: 0, crit: false, expr: damageExpr, multiplier: 1 };
   if (hit && !attack.noDamage && !weapon.manualDamage && config.autoRollDamage) {
     damage = { ...rollDamage(damageExpr), expr: damageExpr };
     if (config.attackType === "autofire") {
       const margin = Math.min(Math.max(attackTotal - targetTotal, 1), weapon.cap);
-      damage = { ...damage, margin, total: damage.total * margin };
+      damage = { ...damage, baseTotal: damage.total, margin, multiplier: margin, total: damage.total * margin };
+    } else {
+      damage = { ...damage, baseTotal: damage.total };
     }
   }
+
+  const ruleNotes = [];
+  if (isHeadShot) ruleNotes.push("头部/弱点攻击自动应用 -8 修正；伤害穿过 SP 后再翻倍。");
+  if (isAreaAttack) ruleNotes.push("区域攻击不能瞄准头部，护甲削减只按身体位置处理。");
+  if (attack.halfArmor) ruleNotes.push("近战/武术按半数 SP 计算防护，但削甲仍从原 SP 扣 1。");
+  if (config.attackType === "autofire") ruleNotes.push("全自动先用命中差额计算倍率，再从乘后的伤害中扣 SP。");
+  if (damage.crit) ruleNotes.push("伤害骰出现两颗或更多 6，触发严重伤势并额外造成 5 点 HP 伤害。");
+  if (useDodge && attack.defender === "range") ruleNotes.push("远程闪避应在攻击掷骰前声明；本工具用防御骰结果作为攻击 DV。");
 
   return {
     attack,
@@ -123,6 +136,12 @@ export function resolveCombat(cards, config) {
     targetLabel: useDodge ? `敏捷 + ${defenseSkill === "brawling" ? "搏击" : "闪避"}` : dvInfo.label,
     useDodge,
     modifier,
+    aimedPenalty,
+    targetPart,
+    requestedTargetPart: config.targetPart,
+    isAreaAttack,
+    isHeadShot,
+    ruleNotes,
     hit,
     damage
   };
@@ -133,19 +152,28 @@ export function applyDamage(card, rawDamage, attack, targetPart, isCrit) {
   const originalSp = num(card[spKey]);
   const effectiveSp = attack.halfArmor ? Math.ceil(originalSp / 2) : originalSp;
   const penetrated = Math.max(0, num(rawDamage) - effectiveSp);
-  let finalDamage = targetPart === "head" && penetrated > 0 ? penetrated * 2 : penetrated;
-  if (isCrit) finalDamage += 5;
+  const headMultiplier = targetPart === "head" && penetrated > 0 ? 2 : 1;
+  const postLocationDamage = penetrated * headMultiplier;
+  const critBonus = isCrit ? 5 : 0;
+  const finalDamage = postLocationDamage + critBonus;
   const armorAbated = penetrated > 0 && originalSp > 0;
+  const nextHp = num(card.hp) - finalDamage;
   return {
     card: {
       ...card,
-      hp: num(card.hp) - finalDamage,
+      hp: nextHp,
       [spKey]: armorAbated ? Math.max(0, originalSp - 1) : originalSp
     },
     finalDamage,
     penetrated,
     originalSp,
     effectiveSp,
+    headMultiplier,
+    postLocationDamage,
+    critBonus,
+    hpBefore: num(card.hp),
+    hpAfter: nextHp,
+    spKey,
     armorAbated
   };
 }

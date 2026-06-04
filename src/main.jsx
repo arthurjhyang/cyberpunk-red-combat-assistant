@@ -159,7 +159,7 @@ function App() {
     }
     const targetId = result.config.defender;
     const before = cards[targetId];
-    const applied = applyDamage(before, result.damage.total, result.attack, result.config.targetPart, result.damage.crit);
+    const applied = applyDamage(before, result.damage.total, result.attack, result.targetPart, result.damage.crit);
     const nextTarget = applied.card;
     setLastSnapshot({ id: targetId, card: before, source: sources[targetId], result });
     setCards(prev => ({ ...prev, [targetId]: nextTarget }));
@@ -641,10 +641,14 @@ function CharacterPanel({ id, card, source, active, onDropFile, onOpenPicker, on
 function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseOnly, onFillBack, onUndo, onSwap, onReset }) {
   const attackType = attackModes[config.attackType] ? config.attackType : "ranged";
   const weapons = attackModes[attackType].weapons;
+  const isAreaAttack = Boolean(attackModes[attackType].area || mode.weapon.area);
 
   function update(patch) {
     setConfig(prev => {
       const next = { ...prev, ...patch };
+      const nextAttack = attackModes[next.attackType] || attackModes.ranged;
+      const nextWeapon = nextAttack.weapons.find(item => item.id === next.weaponId) || nextAttack.weapons[0];
+      if (nextAttack.area || nextWeapon.area) next.targetPart = "body";
       if (next.attacker === next.defender) {
         if (patch.attacker) next.defender = firstOtherId(Object.fromEntries(combatants.map(({ id, card }) => [id, card])), patch.attacker);
         if (patch.defender) next.attacker = firstOtherId(Object.fromEntries(combatants.map(({ id, card }) => [id, card])), patch.defender);
@@ -707,7 +711,7 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
         </SelectField>
         <SelectField label="命中部位" value={config.targetPart} onChange={targetPart => update({ targetPart })}>
           <option value="body">身体</option>
-          <option value="head">头部</option>
+          <option value="head" disabled={isAreaAttack}>头部</option>
         </SelectField>
         <NumberField label="手动修正" value={config.modifier} onChange={modifier => update({ modifier })} />
         <TextField label="固定命中骰" value={config.attackDie} placeholder="空=随机" onChange={attackDie => update({ attackDie })} />
@@ -719,6 +723,7 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
         <CheckField label="远程强制闪避" checked={config.forceDodge} onChange={forceDodge => update({ forceDodge })} />
         <CheckField label="自动掷伤害" checked={config.autoRollDamage} onChange={autoRollDamage => update({ autoRollDamage })} />
       </div>
+      <RuleHint config={config} mode={mode} isAreaAttack={isAreaAttack} />
 
       <div className="button-row primary-actions">
         <button type="button" onClick={onResolve}>
@@ -778,7 +783,10 @@ function ResultPanel({ result, config, onFillBack }) {
     );
   }
 
-  const partLabel = config.targetPart === "head" ? "头部" : "身体";
+  const partLabel = result.targetPart === "head" ? "头部" : "身体";
+  const preview = result.hit && !result.attack.noDamage && result.damage.total > 0
+    ? applyDamage(result.defender, result.damage.total, result.attack, result.targetPart, result.damage.crit)
+    : null;
   return (
     <article className="console-panel result-panel">
       <div className="panel-heading">
@@ -795,18 +803,26 @@ function ResultPanel({ result, config, onFillBack }) {
         <Metric label="目标值" value={result.targetTotal} />
         <Metric label="部位" value={partLabel} />
       </div>
+      {!!result.ruleNotes?.length && (
+        <div className="rules-strip">
+          {result.ruleNotes.map(note => (
+            <span key={note}>
+              <AlertTriangle size={13} />
+              {note}
+            </span>
+          ))}
+        </div>
+      )}
       <div className={`verdict ${result.hit ? "hit" : "miss"}`}>
         <strong>{result.attacker.name}</strong> 使用 <strong>{result.weapon.label}</strong> 对 <strong>{result.defender.name}</strong>：
         {result.attackTotal} {result.hit ? ">" : "<="} {result.targetTotal}。
         {result.hit ? damageText(result) : "未造成伤害。"}
       </div>
+      {!result.applied && preview && (
+        <DamagePreview applied={preview} result={result} />
+      )}
       {result.applied && (
-        <div className="damage-ledger">
-          <span>SP {result.applied.originalSp}{result.attack.halfArmor ? ` / 半甲 ${result.applied.effectiveSp}` : ""}</span>
-          <span>穿透 {result.applied.penetrated}</span>
-          <span>扣 HP {result.applied.finalDamage}</span>
-          <span>{result.applied.armorAbated ? "护甲 SP -1" : "护甲未削减"}</span>
-        </div>
+        <DamagePreview applied={result.applied} result={result} committed />
       )}
       {!result.applied && result.hit && !result.attack.noDamage && result.damage.total > 0 && (
         <div className="result-actions">
@@ -823,6 +839,45 @@ function ResultPanel({ result, config, onFillBack }) {
         </div>
       )}
     </article>
+  );
+}
+
+function RuleHint({ config, mode, isAreaAttack }) {
+  const hints = [];
+  if (config.targetPart === "head") hints.push("头部攻击自动按瞄准/弱点处理，命中修正 -8。");
+  if (isAreaAttack) hints.push("区域攻击固定按身体结算，不能指定头部。");
+  if (mode.attack.halfArmor) hints.push("该动作按半甲计算防护。");
+  if (config.attackType === "autofire") hints.push(`全自动上限 x${mode.weapon.cap}，命中差额决定倍率。`);
+  if (!hints.length) hints.push("命中需严格大于目标值；伤害穿过 SP 才削减护甲。");
+
+  return (
+    <div className="rule-hints">
+      {hints.map(hint => (
+        <span key={hint}>{hint}</span>
+      ))}
+    </div>
+  );
+}
+
+function DamagePreview({ applied, result, committed = false }) {
+  const hpTone = applied.hpAfter < 1 ? "danger" : applied.hpAfter < Math.ceil(num(result.defender.maxHp) / 2) ? "warn" : "";
+  const multiplier = applied.headMultiplier > 1 ? ` x${applied.headMultiplier}` : "";
+  const crit = applied.critBonus ? ` + 严重伤势 ${applied.critBonus}` : "";
+  const damageFormula = `${applied.penetrated}${multiplier}${crit}`;
+
+  return (
+    <div className={`damage-preview ${committed ? "applied" : ""}`}>
+      <div>
+        <span>{committed ? "已回填" : "回填预览"}</span>
+        <strong>{damageFormula} = {applied.finalDamage} HP</strong>
+      </div>
+      <div className="damage-ledger">
+        <span>SP {applied.originalSp}{result.attack.halfArmor ? ` / 半甲 ${applied.effectiveSp}` : ""}</span>
+        <span>穿透 {applied.penetrated}</span>
+        <span className={hpTone}>HP {applied.hpBefore} → {applied.hpAfter}</span>
+        <span>{applied.armorAbated ? "护甲 SP -1" : "护甲未削减"}</span>
+      </div>
+    </div>
   );
 }
 
@@ -932,9 +987,10 @@ function damageText(result) {
   if (result.attack.noDamage) return "命中表示擒拿/抢夺成立。";
   if (!result.damage.total) return "命中，伤害需要 GM 手动决定。";
   const rolls = result.damage.rolls.length ? `伤害骰 ${result.damage.rolls.join(" + ")}` : "伤害骰";
-  const margin = result.damage.margin ? `，全自动倍率 ${result.damage.margin}` : "";
+  const margin = result.damage.margin ? `，全自动倍率 x${result.damage.margin}，乘后伤害 ${result.damage.total}` : "";
+  const head = result.isHeadShot ? "，穿甲后头部伤害翻倍" : "";
   const crit = result.damage.crit ? "，出现严重伤势，额外 +5 HP 伤害" : "";
-  return `${rolls}${margin}，原始伤害 ${result.damage.total}${crit}。`;
+  return `${rolls}${margin || `，原始伤害 ${result.damage.total}`}${head}${crit}。`;
 }
 
 function formatLog(result) {

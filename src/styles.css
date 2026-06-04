@@ -893,6 +893,35 @@ button.window-button.close:hover {
   margin-top: 12px;
 }
 
+.rule-hints,
+.rules-strip {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+}
+
+.rule-hints span,
+.rules-strip span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 5px 8px;
+  border: 1px solid rgba(39, 216, 255, 0.2);
+  border-radius: 7px;
+  color: #b9d5e8;
+  background: rgba(39, 216, 255, 0.055);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.rules-strip span {
+  border-color: rgba(255, 209, 102, 0.26);
+  color: #f0d99c;
+  background: rgba(255, 209, 102, 0.06);
+}
+
 .check-field {
   display: flex;
   align-items: center;
@@ -1000,6 +1029,49 @@ button.window-button.close:hover {
   border-radius: 7px;
   background: rgba(255, 255, 255, 0.045);
   color: #c9d8e9;
+}
+
+.damage-ledger span.warn {
+  color: var(--yellow);
+  border-color: rgba(255, 209, 102, 0.22);
+  background: rgba(255, 209, 102, 0.06);
+}
+
+.damage-ledger span.danger {
+  color: #ff9db3;
+  border-color: rgba(255, 49, 93, 0.26);
+  background: rgba(255, 49, 93, 0.08);
+}
+
+.damage-preview {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid rgba(39, 216, 255, 0.22);
+  border-radius: 8px;
+  background:
+    linear-gradient(90deg, rgba(39, 216, 255, 0.08), rgba(255, 49, 93, 0.045)),
+    rgba(3, 7, 13, 0.42);
+}
+
+.damage-preview.applied {
+  border-color: rgba(92, 255, 157, 0.24);
+  background: rgba(92, 255, 157, 0.07);
+}
+
+.damage-preview > div:first-child {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.damage-preview strong {
+  color: var(--text);
+  font-size: 14px;
+  text-align: right;
 }
 
 .result-actions {
