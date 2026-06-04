@@ -13,6 +13,7 @@
     "dist:win": "set CSC_IDENTITY_AUTO_DISCOVERY=false&& npm run build && electron-builder --win portable --x64"
   },
   "dependencies": {
+    "fflate": "^0.8.3",
     "lucide-react": "^0.555.0",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",

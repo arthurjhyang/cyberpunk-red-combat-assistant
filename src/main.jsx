@@ -46,6 +46,13 @@ import {
 } from "./lib/excelCard.js";
 import "./styles.css";
 
+const fallbackPortraitModules = import.meta.glob("./assets/portraits/*.png", {
+  eager: true,
+  query: "?url",
+  import: "default"
+});
+const fallbackPortraits = Object.values(fallbackPortraitModules).sort();
+
 const initialConfig = {
   attacker: "",
   defender: "",
@@ -746,7 +753,7 @@ function RosterCard({
 
 function Avatar({ card, index = 0, variant = "" }) {
   const initial = String(card?.name || "?").trim().slice(0, 1).toUpperCase() || "?";
-  const image = card?.avatar || defaultAvatar(index, initial);
+  const image = card?.avatar || fallbackPortrait(index);
   return (
     <span
       className={`avatar has-image ${variant ? `avatar-${variant}` : ""}`}
@@ -1546,53 +1553,8 @@ function defaultStagePosition(index) {
   return positions[index % positions.length];
 }
 
-function defaultAvatar(index, initial) {
-  const palettes = [
-    ["#22d8ff", "#ff315d", "#08121d"],
-    ["#54ff9b", "#27d8ff", "#07131a"],
-    ["#ffd166", "#ff315d", "#120b17"],
-    ["#a78bfa", "#27d8ff", "#090d18"]
-  ];
-  const [a, b, bg] = palettes[index % palettes.length];
-  const implant = index % 2 === 0
-    ? `<path d="M126 58h24v64h-15v-42h-9z" fill="${a}" opacity=".9"/>`
-    : `<path d="M38 70h22v80H45v-52H34z" fill="${b}" opacity=".8"/>`;
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 220">
-      <defs>
-        <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
-          <stop stop-color="${a}"/>
-          <stop offset=".58" stop-color="${b}"/>
-          <stop offset="1" stop-color="${bg}"/>
-        </linearGradient>
-        <radialGradient id="r" cx=".5" cy=".28" r=".72">
-          <stop stop-color="#ffffff" stop-opacity=".28"/>
-          <stop offset=".42" stop-color="${a}" stop-opacity=".16"/>
-          <stop offset="1" stop-color="#000000" stop-opacity=".72"/>
-        </radialGradient>
-      </defs>
-      <path d="M0 22 22 0h158v198l-22 22H0z" fill="${bg}"/>
-      <path d="M0 22 22 0h158v198l-22 22H0z" fill="url(#g)" opacity=".72"/>
-      <path d="M0 0h180v220H0z" fill="url(#r)"/>
-      <path d="M47 201c5-45 22-66 43-66s38 21 43 66z" fill="#07101a" opacity=".9"/>
-      <path d="M58 84c0-35 18-56 40-56 23 0 38 22 38 57 0 42-16 72-39 72-24 0-39-31-39-73z" fill="#0d1722"/>
-      <path d="M65 96h70" stroke="${a}" stroke-width="7" stroke-linecap="square" opacity=".88"/>
-      <path d="M72 63c12-21 37-28 62-6" stroke="#fff" stroke-opacity=".18" stroke-width="10" stroke-linecap="round"/>
-      ${implant}
-      <text x="90" y="182" text-anchor="middle" font-family="Microsoft YaHei, sans-serif" font-size="42" font-weight="900" fill="#f4f8ff">${escapeSvg(initial)}</text>
-      <path d="M10 34V12h26M170 186v22h-26" fill="none" stroke="${a}" stroke-width="3" opacity=".85"/>
-    </svg>`;
-  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
-}
-
-function escapeSvg(text) {
-  return String(text).replace(/[&<>"']/g, char => ({
-    "&": "&amp;",
-    "<": "&lt;",
-    ">": "&gt;",
-    "\"": "&quot;",
-    "'": "&apos;"
-  }[char]));
+function fallbackPortrait(index) {
+  return fallbackPortraits[index % fallbackPortraits.length] || "";
 }
 
 function mapPoint(index) {

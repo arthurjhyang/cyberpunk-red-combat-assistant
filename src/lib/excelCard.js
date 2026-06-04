@@ -1,4 +1,5 @@
 import * as XLSX from "xlsx";
+import { unzipSync } from "fflate";
 import { blankSkills } from "../data/sampleCards.js";
 import { num } from "./combat.js";
 
@@ -52,7 +53,10 @@ export async function readWorkbookBuffer(fileName, buffer, handle = null) {
     cellStyles: true,
     cellDates: true
   });
-  const card = extractCard(workbook, fileName);
+  const card = {
+    ...extractCard(workbook, fileName),
+    avatar: extractAvatarFromWorkbookBuffer(buffer)
+  };
   return {
     fileName,
     handle,
@@ -61,6 +65,29 @@ export async function readWorkbookBuffer(fileName, buffer, handle = null) {
     dirty: false,
     canDirectSave: Boolean(handle?.createWritable || handle?.electronPath)
   };
+}
+
+function extractAvatarFromWorkbookBuffer(buffer) {
+  try {
+    const zip = unzipSync(new Uint8Array(buffer));
+    const media = Object.entries(zip)
+      .filter(([name]) => /^xl\/media\/image\d+\.(png|jpe?g|webp)$/i.test(name))
+      .map(([name, bytes]) => ({ name, bytes }))
+      .sort((a, b) => b.bytes.length - a.bytes.length);
+    const image = media[0];
+    if (!image) return "";
+    return `data:${mimeForImage(image.name, image.bytes)};base64,${uint8ToBase64(image.bytes)}`;
+  } catch {
+    return "";
+  }
+}
+
+function mimeForImage(name, bytes) {
+  if (/\.webp$/i.test(name)) return "image/webp";
+  if (/\.jpe?g$/i.test(name)) return "image/jpeg";
+  if (bytes?.[0] === 0xff && bytes?.[1] === 0xd8) return "image/jpeg";
+  if (bytes?.[0] === 0x52 && bytes?.[1] === 0x49 && bytes?.[2] === 0x46 && bytes?.[3] === 0x46) return "image/webp";
+  return "image/png";
 }
 
 export async function openWorkbookWithPicker() {
@@ -223,7 +250,7 @@ function writeWorkbookBuffer(workbook) {
 }
 
 function base64ToArrayBuffer(base64) {
-  const binary = window.atob(base64);
+  const binary = globalThis.atob ? globalThis.atob(base64) : Buffer.from(base64, "base64").toString("binary");
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) {
     bytes[index] = binary.charCodeAt(index);
@@ -233,10 +260,14 @@ function base64ToArrayBuffer(base64) {
 
 function arrayBufferToBase64(buffer) {
   const bytes = new Uint8Array(buffer);
+  return uint8ToBase64(bytes);
+}
+
+function uint8ToBase64(bytes) {
   let binary = "";
   const chunkSize = 0x8000;
   for (let index = 0; index < bytes.length; index += chunkSize) {
     binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
   }
-  return window.btoa(binary);
+  return globalThis.btoa ? globalThis.btoa(binary) : Buffer.from(binary, "binary").toString("base64");
 }
