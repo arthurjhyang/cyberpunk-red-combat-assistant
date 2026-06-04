@@ -7,6 +7,7 @@ import {
   BookOpen,
   ClipboardList,
   Crosshair,
+  Edit3,
   FileSpreadsheet,
   FolderOpen,
   Maximize2,
@@ -270,7 +271,8 @@ function App() {
   }
 
   function pushLog(text) {
-    setLog(prev => [text, ...prev].slice(0, 16));
+    const tone = text.includes("未命中") ? "miss" : text.includes("命中") || text.includes("回填") ? "hit" : "info";
+    setLog(prev => [{ text, tone, time: new Date().toLocaleTimeString("zh-CN", { hour12: false }) }, ...prev].slice(0, 16));
   }
 
   return (
@@ -285,7 +287,7 @@ function App() {
         />
 
         {activeView === "combat" && (
-        <section className="terminal-layout">
+        <section className="terminal-layout hud-frame">
           <RosterPanel
             combatants={combatants}
             sources={sources}
@@ -506,12 +508,18 @@ function RosterPanel({
 }) {
   const [compact, setCompact] = useState(false);
 
+  function handleDockDrop(event) {
+    event.preventDefault();
+    onDragSide(null);
+    onDropFile(selectedCardId, event.dataTransfer.files?.[0]);
+  }
+
   return (
     <aside className={`roster-panel ${compact ? "compact" : ""}`}>
       <div className="panel-heading">
         <div>
-          <h2>作战名册</h2>
-          <p>点击卡位编辑，或直接设为攻击方/目标。</p>
+          <h2>战斗人员 <span>{combatants.length}/12</span></h2>
+          <p>点击卡位编辑，攻/目按钮指定当前对决。</p>
         </div>
         <div className="panel-tools">
           <button type="button" className="icon-button secondary" onClick={() => setCompact(prev => !prev)} title="切换列表密度">
@@ -543,6 +551,21 @@ function RosterPanel({
             canRemove={combatants.length > 2}
           />
         ))}
+      </div>
+      <div
+        className="roster-import-dock"
+        onDragOver={event => {
+          event.preventDefault();
+          onDragSide(selectedCardId);
+        }}
+        onDragLeave={() => onDragSide(null)}
+        onDrop={handleDockDrop}
+      >
+        <UploadCloud size={22} />
+        <div>
+          <strong>拖拽 .xlsx 自动卡到此处导入</strong>
+          <span>写入当前选中卡位 · 支持鲨鱼包 / 芬里尔 1.7+</span>
+        </div>
       </div>
     </aside>
   );
@@ -587,16 +610,20 @@ function RosterCard({
       onDrop={handleDrop}
     >
       <div className="roster-index">{index + 1}</div>
-      <Avatar card={card} index={index} />
+      <Avatar card={card} index={index} variant="roster" />
       <div className="roster-main">
         <div className="roster-title">
           <strong>{card.name || slotLabel(id)}</strong>
           <span className={`role-light ${role || wound.tone}`}>{role ? (role === "attacker" ? "攻击" : "目标") : wound.label}</span>
         </div>
         <p>{source?.fileName || card.alias || "拖拽 xlsx 到此卡位"}</p>
-        <div className="micro-bars">
+        <div className="roster-vitals">
+          <span>HP <b>{card.hp}/{card.maxHp}</b></span>
+          <span>身体SP <b>{card.bodySp}</b></span>
+          <span>头部SP <b>{card.headSp}</b></span>
+        </div>
+        <div className="micro-bars" aria-label={`HP ${card.hp}/${card.maxHp}`}>
           <span className="hp-bar" style={{ width: `${hpPercent}%` }} />
-          <span className="sp-readout">SP {card.bodySp}/{card.headSp}</span>
         </div>
         <div className="roster-actions" onClick={event => event.stopPropagation()}>
           <input
@@ -618,6 +645,9 @@ function RosterCard({
           <button type="button" className="ghost-button red" onClick={() => onSetDefender(id)}>
             目
           </button>
+          <button type="button" className="ghost-button" onClick={() => onSelect(id)} title="编辑卡位">
+            <Edit3 size={13} />
+          </button>
           <button type="button" className="ghost-button danger" onClick={() => onRemove(id)} disabled={!canRemove} title="删除卡位">
             <Trash2 size={13} />
           </button>
@@ -627,10 +657,10 @@ function RosterCard({
   );
 }
 
-function Avatar({ card, index = 0 }) {
+function Avatar({ card, index = 0, variant = "" }) {
   const initial = String(card?.name || "?").trim().slice(0, 1).toUpperCase() || "?";
   return (
-    <span className="avatar" style={{ "--avatar-hue": (index * 47 + 190) % 360 }}>
+    <span className={`avatar ${variant ? `avatar-${variant}` : ""}`} style={{ "--avatar-hue": (index * 47 + 190) % 360 }}>
       {card?.avatar ? <img src={card.avatar} alt="" /> : <b>{initial}</b>}
     </span>
   );
@@ -642,6 +672,7 @@ function TacticalBoard({ combatants, config, attacker, defender, threat, mode, o
   const defenderIndex = combatants.findIndex(item => item.id === config.defender);
   const attackerPoint = mapPoint(attackerIndex < 0 ? 0 : attackerIndex);
   const defenderPoint = mapPoint(defenderIndex < 0 ? 1 : defenderIndex);
+  const route = routePath(attackerPoint, defenderPoint);
 
   function pickToken(id) {
     if (nextPick === "attacker") {
@@ -662,7 +693,7 @@ function TacticalBoard({ combatants, config, attacker, defender, threat, mode, o
       <div className="panel-heading">
         <div>
           <h2>当前对决</h2>
-          <p>点击战场 token：下一次指定{nextPick === "attacker" ? "攻击方" : "目标"}。</p>
+          <p>点击战场头像牌：下一次指定{nextPick === "attacker" ? "攻击方" : "目标"}。</p>
         </div>
         <button type="button" className="icon-button" onClick={onSwap} title="交换攻防">
           <ArrowLeftRight size={17} />
@@ -706,7 +737,16 @@ function TacticalBoard({ combatants, config, attacker, defender, threat, mode, o
         "--defender-x": `${defenderPoint.x}%`,
         "--defender-y": `${defenderPoint.y}%`
       }}>
-        <div className="attack-vector" />
+        <div className="map-header">
+          <span>战场态势</span>
+          <strong>{distanceBands[num(config.distanceBand)]}</strong>
+        </div>
+        <svg className="attack-route" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+          <path className="route-shadow" d={route} />
+          <path className="route-cyan" d={route} />
+          <circle className="route-start" cx={attackerPoint.x} cy={attackerPoint.y} r="1.8" />
+          <circle className="route-end" cx={defenderPoint.x} cy={defenderPoint.y} r="2.1" />
+        </svg>
         {combatants.map(({ id, card, index }) => {
           const point = mapPoint(index);
           return (
@@ -717,8 +757,9 @@ function TacticalBoard({ combatants, config, attacker, defender, threat, mode, o
             style={{ left: `${point.x}%`, top: `${point.y}%` }}
             onClick={() => pickToken(id)}
           >
-            <Avatar card={card} index={index} />
+            <Avatar card={card} index={index} variant="token" />
             <span>{index + 1}</span>
+            <em>{card.name}</em>
           </button>
           );
         })}
@@ -729,20 +770,29 @@ function TacticalBoard({ combatants, config, attacker, defender, threat, mode, o
 
 function CombatantSpot({ role, tone, card, id }) {
   const wound = woundState(card);
+  const hpPercent = Math.max(0, Math.min(100, (num(card.hp) / Math.max(1, num(card.maxHp))) * 100));
   return (
     <div className={`combatant-spot ${tone}`}>
-      <div className="spot-top">
-        <span>{role} · {slotLabel(id)}</span>
-        <Avatar card={card} index={Number(String(id).match(/(\d+)$/)?.[1] || 1) - 1} />
+      <div className="spot-frame">
+        <Avatar card={card} index={Number(String(id).match(/(\d+)$/)?.[1] || 1) - 1} variant="duel" />
+        <span>{role}</span>
       </div>
-      <strong>{card.name}</strong>
-      <p>{card.alias || wound.label}</p>
-      <div className="spot-stats">
-        <span>REF <b>{card.ref}</b></span>
-        <span>DEX <b>{card.dex}</b></span>
-        <span>BODY <b>{card.body}</b></span>
-        <span>HP <b>{card.hp}/{card.maxHp}</b></span>
-        <span>SP <b>{card.bodySp}/{card.headSp}</b></span>
+      <div className="spot-data">
+        <span>{role} · {slotLabel(id)}</span>
+        <strong>{card.name}</strong>
+        <p>{card.alias || wound.label}</p>
+        <div className="spot-stats">
+          <span>REF <b>{card.ref}</b></span>
+          <span>DEX <b>{card.dex}</b></span>
+          <span>BODY <b>{card.body}</b></span>
+          <span>COOL <b>{card.cool}</b></span>
+          <span>WILL <b>{card.will}</b></span>
+          <span>MOVE <b>{card.move}</b></span>
+        </div>
+        <div className="spot-bars">
+          <div><span>HP</span><b>{card.hp}/{card.maxHp}</b><i style={{ width: `${hpPercent}%` }} /></div>
+          <div><span>SP</span><b>身体 {card.bodySp} / 头部 {card.headSp}</b></div>
+        </div>
       </div>
     </div>
   );
@@ -858,11 +908,11 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
   }
 
   return (
-    <article className="console-panel">
+    <article className="console-panel combat-console">
       <div className="panel-heading">
         <div>
-          <h2>结算器</h2>
-          <p>攻防对象可从任意卡位选择。</p>
+          <h2>战斗结算控制台</h2>
+          <p>攻防对象、射程、部位与规则修正集中控制。</p>
         </div>
         <button type="button" className="icon-button" onClick={onSwap} title="交换攻防">
           <ArrowLeftRight size={17} />
@@ -953,7 +1003,7 @@ function ResultPanel({ result, config, onFillBack }) {
     return (
       <article className="console-panel result-panel empty">
         <div className="panel-heading">
-          <h2>结果</h2>
+          <h2>结算结果</h2>
         </div>
         <p>先从名册选择攻击方和目标，然后点击“只看基础值”或“掷骰并结算”。</p>
       </article>
@@ -962,7 +1012,10 @@ function ResultPanel({ result, config, onFillBack }) {
   if (result.error) {
     return (
       <article className="console-panel result-panel">
-        <div className="verdict miss">{result.error}</div>
+        <div className="result-verdict miss">
+          <strong>规则错误</strong>
+          <span>{result.error}</span>
+        </div>
       </article>
     );
   }
@@ -989,9 +1042,9 @@ function ResultPanel({ result, config, onFillBack }) {
     : null;
   return (
     <article className="console-panel result-panel">
-      <div className="panel-heading">
-        <h2>结果</h2>
-        <span className={`status-pill ${result.hit ? "hit" : "miss"}`}>{result.hit ? "命中" : "未命中"}</span>
+      <div className={`result-verdict ${result.hit ? "hit" : "miss"}`}>
+        <strong>{result.hit ? "命中" : "未命中"}</strong>
+        <span>攻击总值 <b>{result.attackTotal}</b> {result.hit ? ">" : "≤"} 目标值 <b>{result.targetTotal}</b></span>
       </div>
       <div className="formula-grid">
         <Metric label="攻击基础" value={result.attackBase} />
@@ -1083,7 +1136,7 @@ function DamagePreview({ applied, result, committed = false }) {
 
 function LogPanel({ log, onClear }) {
   return (
-    <article className="console-panel">
+    <article className="console-panel log-panel">
       <div className="panel-heading">
         <h2>战斗记录</h2>
         <button type="button" className="secondary mini" onClick={onClear}>
@@ -1091,7 +1144,15 @@ function LogPanel({ log, onClear }) {
         </button>
       </div>
       <div className="log-list">
-        {log.length ? log.map((item, index) => <div key={`${item}-${index}`}>{item}</div>) : <p>还没有结算记录。</p>}
+        {log.length ? log.map((item, index) => {
+          const entry = typeof item === "string" ? { text: item, tone: item.includes("未命中") ? "miss" : item.includes("命中") ? "hit" : "info", time: "--:--:--" } : item;
+          return (
+            <div className={`log-entry ${entry.tone}`} key={`${entry.text}-${index}`}>
+              <time>{entry.time}</time>
+              <span>{entry.text}</span>
+            </div>
+          );
+        }) : <p>还没有结算记录。</p>}
       </div>
     </article>
   );
@@ -1234,6 +1295,12 @@ function mapPoint(index) {
     { x: 88, y: 52 }
   ];
   return points[index % points.length];
+}
+
+function routePath(from, to) {
+  const midX = Math.round((from.x + to.x) / 2);
+  const bendY = Math.round((from.y + to.y) / 2 + (from.y > to.y ? -8 : 8));
+  return `M ${from.x} ${from.y} L ${midX} ${from.y} L ${midX} ${bendY} L ${to.x} ${to.y}`;
 }
 
 createRoot(document.getElementById("root")).render(<App />);
