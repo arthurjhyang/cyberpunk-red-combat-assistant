@@ -16,12 +16,13 @@ import {
   Shield,
   Swords,
   Terminal,
+  Trash2,
   UploadCloud,
   Users,
   X,
   Zap
 } from "lucide-react";
-import { attackModes, distanceBands, skillLabels, statLabels } from "./data/rules.js";
+import { attackModes, autofireDv, distanceBands, rangeDv, skillLabels, statLabels } from "./data/rules.js";
 import { createBlankCard, sampleCards } from "./data/sampleCards.js";
 import {
   applyDamage,
@@ -212,12 +213,45 @@ function App() {
   }
 
   function addCombatant() {
-    const nextIndex = combatants.length + 1;
+    const usedNumbers = Object.keys(cards)
+      .map(id => Number(String(id).match(/(\d+)$/)?.[1]))
+      .filter(Number.isFinite);
+    const nextIndex = Math.max(0, ...usedNumbers) + 1;
     const id = `slot-${nextIndex}`;
     setCards(prev => ({ ...prev, [id]: createBlankCard(nextIndex) }));
     setSources(prev => ({ ...prev, [id]: null }));
     setSelectedCardId(id);
     pushLog(`新增 ${slotLabel(id)}。`);
+  }
+
+  function removeCombatant(id) {
+    if (!cards[id]) return;
+    const ids = Object.keys(cards);
+    if (ids.length <= 2) {
+      setToast("至少保留 2 名战斗人员用于攻防结算。");
+      return;
+    }
+    const removed = cards[id];
+    const remaining = ids.filter(item => item !== id);
+    const nextAttacker = config.attacker === id ? remaining[0] : config.attacker;
+    const nextDefender = config.defender === id
+      ? remaining.find(item => item !== nextAttacker) || remaining[0]
+      : config.defender;
+    setCards(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setSources(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setConfig(prev => ({ ...prev, attacker: nextAttacker, defender: nextDefender }));
+    setSelectedCardId(prev => (prev === id ? nextAttacker : prev));
+    setResult(null);
+    setLastSnapshot(null);
+    pushLog(`移除 ${slotLabel(id)}：${removed.name || "未命名角色"}。`);
   }
 
   function resetDemo() {
@@ -270,6 +304,7 @@ function App() {
             onDropFile={importFile}
             onOpenPicker={openWithPicker}
             onAdd={addCombatant}
+            onRemove={removeCombatant}
           />
 
           <section className="center-stack">
@@ -293,6 +328,8 @@ function App() {
               onOpenPicker={openWithPicker}
               onSaveDirect={saveDirect}
               onChange={patchCard}
+              onRemove={removeCombatant}
+              canRemove={combatants.length > 2}
             />
           </section>
 
@@ -379,7 +416,8 @@ function RosterPanel({
   onSetDefender,
   onDropFile,
   onOpenPicker,
-  onAdd
+  onAdd,
+  onRemove
 }) {
   return (
     <aside className="roster-panel">
@@ -409,6 +447,8 @@ function RosterPanel({
             onSetDefender={onSetDefender}
             onDropFile={onDropFile}
             onOpenPicker={onOpenPicker}
+            onRemove={onRemove}
+            canRemove={combatants.length > 2}
           />
         ))}
       </div>
@@ -429,7 +469,9 @@ function RosterCard({
   onSetAttacker,
   onSetDefender,
   onDropFile,
-  onOpenPicker
+  onOpenPicker,
+  onRemove,
+  canRemove
 }) {
   const fileInputRef = useRef(null);
   const wound = woundState(card);
@@ -482,6 +524,9 @@ function RosterCard({
           </button>
           <button type="button" className="ghost-button red" onClick={() => onSetDefender(id)}>
             目
+          </button>
+          <button type="button" className="ghost-button danger" onClick={() => onRemove(id)} disabled={!canRemove} title="删除卡位">
+            <Trash2 size={13} />
           </button>
         </div>
       </div>
@@ -558,7 +603,7 @@ function CombatantSpot({ role, tone, card, id }) {
   );
 }
 
-function CharacterPanel({ id, card, source, active, onDropFile, onOpenPicker, onSaveDirect, onChange }) {
+function CharacterPanel({ id, card, source, active, onDropFile, onOpenPicker, onSaveDirect, onChange, onRemove, canRemove }) {
   const fileInputRef = useRef(null);
   const wound = woundState(card);
   const sideLabel = slotLabel(id);
@@ -571,7 +616,17 @@ function CharacterPanel({ id, card, source, active, onDropFile, onOpenPicker, on
           <h2>{card.name || "未命名角色"}</h2>
           <p>{card.alias || source?.fileName || "手动卡 / 等待导入"}</p>
         </div>
-        <div className={`wound ${wound.tone}`}>{wound.label}</div>
+        <div className="panel-tools">
+          <div className={`wound ${wound.tone}`}>{wound.label}</div>
+          <button type="button" className="ghost-button danger" onClick={() => onRemove(id)} disabled={!canRemove} title="删除当前角色">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      </div>
+
+      <div className="identity-grid">
+        <TextField label="角色名" value={card.name} onChange={name => onChange(id, { name })} />
+        <TextField label="代号 / 备注" value={card.alias} onChange={alias => onChange(id, { alias })} />
       </div>
 
       <div className="drop-zone">
@@ -642,6 +697,8 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
   const attackType = attackModes[config.attackType] ? config.attackType : "ranged";
   const weapons = attackModes[attackType].weapons;
   const isAreaAttack = Boolean(attackModes[attackType].area || mode.weapon.area);
+  const distanceTable = attackType === "autofire" ? autofireDv : rangeDv;
+  const activeDv = distanceTable[mode.weapon.family]?.[num(config.distanceBand)] ?? attackModes[attackType].fixedDv ?? null;
 
   function update(patch) {
     setConfig(prev => {
@@ -684,39 +741,20 @@ function CombatConsole({ combatants, config, setConfig, mode, onResolve, onBaseO
             </option>
           ))}
         </SelectField>
-        <SelectField
-          label="攻击类型"
-          value={attackType}
-          onChange={value => update({ attackType: value, weaponId: attackModes[value].weapons[0].id })}
-        >
-          {Object.entries(attackModes).map(([key, attack]) => (
-            <option key={key} value={key}>
-              {attack.label}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField label="武器/动作" value={mode.weapon.id} onChange={weaponId => update({ weaponId })}>
-          {weapons.map(weapon => (
-            <option key={weapon.id} value={weapon.id}>
-              {weapon.label}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField label="距离" value={String(config.distanceBand)} onChange={distanceBand => update({ distanceBand: Number(distanceBand) })}>
-          {distanceBands.map((label, index) => (
-            <option key={label} value={index}>
-              {label}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField label="命中部位" value={config.targetPart} onChange={targetPart => update({ targetPart })}>
-          <option value="body">身体</option>
-          <option value="head" disabled={isAreaAttack}>头部</option>
-        </SelectField>
         <NumberField label="手动修正" value={config.modifier} onChange={modifier => update({ modifier })} />
         <TextField label="固定命中骰" value={config.attackDie} placeholder="空=随机" onChange={attackDie => update({ attackDie })} />
         <TextField label="固定防御骰" value={config.defenseDie} placeholder="空=随机" onChange={defenseDie => update({ defenseDie })} />
       </div>
+
+      <TacticalSwitchboard
+        attackType={attackType}
+        weapons={weapons}
+        mode={mode}
+        config={config}
+        activeDv={activeDv}
+        isAreaAttack={isAreaAttack}
+        onChange={update}
+      />
 
       <div className="toggle-grid">
         <CheckField label="瞄准/弱点 -8" checked={config.aimed} onChange={aimed => update({ aimed })} />
@@ -839,6 +877,97 @@ function ResultPanel({ result, config, onFillBack }) {
         </div>
       )}
     </article>
+  );
+}
+
+function TacticalSwitchboard({ attackType, weapons, mode, config, activeDv, isAreaAttack, onChange }) {
+  return (
+    <div className="tactical-switchboard">
+      <div className="switchboard-head">
+        <span>FIRE CONTROL</span>
+        <strong>{activeDv ? `DV ${activeDv}` : mode.attack.fixedDv ? `固定 DV ${mode.attack.fixedDv}` : "需对抗"}</strong>
+      </div>
+
+      <div className="chip-section">
+        <span>攻击协议</span>
+        <div className="chip-grid attack-protocols">
+          {Object.entries(attackModes).map(([key, attack]) => (
+            <button
+              key={key}
+              type="button"
+              className={`terminal-chip ${attackType === key ? "active" : ""}`}
+              onClick={() => onChange({ attackType: key, weaponId: attack.weapons[0].id })}
+            >
+              <strong>{attack.label}</strong>
+              <small>{statLabels[attack.stat]} / {attack.defender === "range" ? "射程DV" : attack.defender === "dv" ? `固定DV ${attack.fixedDv}` : "对抗"}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="chip-section">
+        <span>武器 / 动作</span>
+        <div className="chip-grid weapon-protocols">
+          {weapons.map(weapon => (
+            <button
+              key={weapon.id}
+              type="button"
+              className={`terminal-chip ${mode.weapon.id === weapon.id ? "active hot" : ""}`}
+              onClick={() => onChange({ weaponId: weapon.id })}
+            >
+              <strong>{weapon.label}</strong>
+              <small>{[skillLabels[weapon.skill], weapon.damage, weapon.cap ? `x${weapon.cap}` : weapon.rof ? `ROF ${weapon.rof}` : ""].filter(Boolean).join(" / ")}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="chip-section">
+        <span>距离窗口</span>
+        <div className="distance-rail">
+          {distanceBands.map((label, index) => {
+            const dv = attackType === "autofire"
+              ? autofireDv[mode.weapon.family]?.[index]
+              : rangeDv[mode.weapon.family]?.[index];
+            const disabled = !mode.attack.fixedDv && dv == null && mode.attack.defender === "range";
+            return (
+              <button
+                key={label}
+                type="button"
+                className={`distance-node ${num(config.distanceBand) === index ? "active" : ""}`}
+                disabled={disabled}
+                onClick={() => onChange({ distanceBand: index })}
+              >
+                <strong>{label}</strong>
+                <small>{mode.attack.fixedDv ? `固定 ${mode.attack.fixedDv}` : dv ? `DV ${dv}` : "不可用"}</small>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="hit-zone-panel">
+        <button
+          type="button"
+          className={`hit-zone ${config.targetPart === "body" ? "active" : ""}`}
+          onClick={() => onChange({ targetPart: "body" })}
+        >
+          <span>BODY</span>
+          <strong>身体</strong>
+          <small>使用身体 SP</small>
+        </button>
+        <button
+          type="button"
+          className={`hit-zone ${config.targetPart === "head" ? "active danger" : ""}`}
+          disabled={isAreaAttack}
+          onClick={() => onChange({ targetPart: "head" })}
+        >
+          <span>HEAD</span>
+          <strong>头部 / 弱点</strong>
+          <small>{isAreaAttack ? "区域攻击禁用" : "-8，穿甲后 x2"}</small>
+        </button>
+      </div>
+    </div>
   );
 }
 
