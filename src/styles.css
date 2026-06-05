@@ -674,8 +674,8 @@ button.window-button.close:hover {
   grid-template-columns: 28px 74px minmax(0, 1fr);
   gap: 10px;
   min-width: 0;
-  min-height: 118px;
-  padding: 8px 10px 8px 8px;
+  min-height: 126px;
+  padding: 8px 66px 8px 8px;
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 0;
   background:
@@ -929,10 +929,23 @@ button.window-button.close:hover {
 }
 
 .roster-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 7px;
+  position: absolute;
+  right: 9px;
+  top: auto;
+  bottom: 12px;
+  z-index: 3;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+  margin: 0;
+}
+
+.roster-actions .ghost-button {
+  width: 24px;
+  min-width: 24px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
 }
 
 .roster-import-dock {
@@ -967,8 +980,10 @@ button.window-button.close:hover {
 }
 
 .roster-actions .ghost-button {
-  min-height: 24px;
-  min-width: 26px;
+  width: 24px;
+  min-height: 22px;
+  min-width: 24px;
+  height: 22px;
 }
 
 .roster-panel.compact .roster-list {
@@ -1392,30 +1407,54 @@ button.window-button.close:hover {
 
 .attack-route path {
   fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
   vector-effect: non-scaling-stroke;
 }
 
 .route-shadow {
-  stroke: rgba(255, 49, 93, 0.38);
-  stroke-width: 5;
-  filter: blur(2px);
+  stroke: rgba(39, 216, 255, 0.2);
+  stroke-width: 9;
+  filter: url("#route-glow");
+  opacity: 0.7;
+}
+
+.route-hot {
+  stroke: rgba(255, 49, 93, 0.34);
+  stroke-width: 4;
+  stroke-dasharray: 2 9;
+  stroke-dashoffset: 0;
+  filter: url("#route-glow");
+  animation: routePulse 1.85s linear infinite reverse;
 }
 
 .route-cyan {
-  stroke: rgba(39, 216, 255, 0.9);
-  stroke-width: 2;
-  stroke-dasharray: 10 5;
-  animation: routePulse 1.6s linear infinite;
+  stroke: url("#route-neon-gradient");
+  stroke-width: 2.4;
+  stroke-dasharray: 13 7;
+  filter: url("#route-glow");
+  animation: routePulse 1.45s linear infinite;
 }
 
 .route-start {
-  fill: var(--cyan);
-  filter: drop-shadow(0 0 8px rgba(39, 216, 255, 0.8));
+  fill: rgba(3, 7, 13, 0.86);
+  stroke: var(--cyan);
+  stroke-width: 0.75;
+  filter: drop-shadow(0 0 8px rgba(39, 216, 255, 0.86));
+  animation: endpointPing 1.8s ease-in-out infinite;
 }
 
 .route-end {
-  fill: var(--red);
-  filter: drop-shadow(0 0 8px rgba(255, 49, 93, 0.8));
+  fill: rgba(3, 7, 13, 0.86);
+  stroke: var(--red);
+  stroke-width: 0.8;
+  filter: drop-shadow(0 0 8px rgba(255, 49, 93, 0.86));
+  animation: endpointPing 1.8s ease-in-out infinite 0.28s;
+}
+
+.route-runner {
+  fill: #f8fbff;
+  filter: drop-shadow(0 0 5px rgba(39, 216, 255, 0.95)) drop-shadow(0 0 8px rgba(255, 49, 93, 0.65));
 }
 
 .map-token {
@@ -1465,8 +1504,8 @@ button.window-button.close:hover {
 
 .map-token > .token-index {
   position: absolute;
-  right: -4px;
-  bottom: -4px;
+  right: 3px;
+  bottom: 3px;
   width: 18px;
   height: 18px;
   display: grid;
@@ -1480,16 +1519,16 @@ button.window-button.close:hover {
 
 .token-role {
   position: absolute;
-  left: -5px;
-  top: -5px;
-  width: 22px;
-  height: 22px;
+  left: 3px;
+  top: 3px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   color: #031018;
   background: var(--cyan);
   border: 1px solid rgba(255, 255, 255, 0.36);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1;
   box-shadow: 0 0 18px rgba(39, 216, 255, 0.36);
 }
@@ -1521,6 +1560,18 @@ button.window-button.close:hover {
 @keyframes routePulse {
   to {
     stroke-dashoffset: -30;
+  }
+}
+
+@keyframes endpointPing {
+  0%,
+  100% {
+    r: 1.75px;
+    opacity: 0.78;
+  }
+  50% {
+    r: 2.55px;
+    opacity: 1;
   }
 }
 

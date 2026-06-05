@@ -919,8 +919,26 @@ function TacticalBoard({
         </div>
         {route && (
           <svg className="attack-route" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="route-neon-gradient" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%" stopColor="#27d8ff" />
+                <stop offset="50%" stopColor="#a78bfa" />
+                <stop offset="100%" stopColor="#ff315d" />
+              </linearGradient>
+              <filter id="route-glow" x="-20%" y="-20%" width="140%" height="140%">
+                <feGaussianBlur stdDeviation="1.25" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
             <path className="route-shadow" d={route} />
+            <path className="route-hot" d={route} />
             <path className="route-cyan" d={route} />
+            <circle className="route-runner" r="1.15">
+              <animateMotion dur="1.65s" repeatCount="indefinite" path={route} />
+            </circle>
             <circle className="route-start" cx={attackerPoint.x} cy={attackerPoint.y} r="1.8" />
             <circle className="route-end" cx={defenderPoint.x} cy={defenderPoint.y} r="2.1" />
           </svg>
@@ -1625,9 +1643,19 @@ function mapPoint(index) {
 }
 
 function routePath(from, to) {
-  const midX = Math.round((from.x + to.x) / 2);
-  const bendY = Math.round((from.y + to.y) / 2 + (from.y > to.y ? -8 : 8));
-  return `M ${from.x} ${from.y} L ${midX} ${from.y} L ${midX} ${bendY} L ${to.x} ${to.y}`;
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const sweep = Math.max(7, Math.min(16, Math.abs(dx) * 0.18 + Math.abs(dy) * 0.08));
+  const side = dy >= 0 ? 1 : -1;
+  const c1x = from.x + dx * 0.36;
+  const c1y = from.y + side * sweep;
+  const c2x = from.x + dx * 0.68;
+  const c2y = to.y - side * sweep;
+  return `M ${roundPoint(from.x)} ${roundPoint(from.y)} C ${roundPoint(c1x)} ${roundPoint(c1y)} ${roundPoint(c2x)} ${roundPoint(c2y)} ${roundPoint(to.x)} ${roundPoint(to.y)}`;
+}
+
+function roundPoint(value) {
+  return Math.round(value * 10) / 10;
 }
 
 createRoot(document.getElementById("root")).render(<App />);
