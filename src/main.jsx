@@ -206,6 +206,10 @@ function App() {
 
   async function importFile(id, file, handle = null, position = null) {
     if (!file) return;
+    if (!isSpreadsheetFile(file)) {
+      setToast("只支持导入 .xlsx 自动卡，请拖入角色卡表格文件。");
+      return;
+    }
     try {
       const source = await readWorkbookFile(file, handle);
       const targetId = id || nextSlotId(cards);
@@ -725,6 +729,7 @@ function RosterPanel({
   function handleDockDrop(event) {
     event.preventDefault();
     onDragSide(null);
+    if (draggedCombatantId(event.dataTransfer)) return;
     onDropFile("", event.dataTransfer.files?.[0]);
   }
 
@@ -824,6 +829,7 @@ function RosterCard({
   function handleDrop(event) {
     event.preventDefault();
     onDragSide(null);
+    if (draggedCombatantId(event.dataTransfer)) return;
     onDropFile(id, event.dataTransfer.files?.[0]);
   }
 
@@ -899,7 +905,7 @@ function Avatar({ card, index = 0, variant = "" }) {
       className={`avatar has-image ${variant ? `avatar-${variant}` : ""}`}
       style={{ "--avatar-hue": (index * 47 + 190) % 360, "--avatar-seed": index % 4 }}
     >
-      <img src={image} alt="" />
+      <img src={image} alt="" draggable={false} />
     </span>
   );
 }
@@ -959,15 +965,17 @@ function TacticalBoard({
     event.preventDefault();
     setMapDragActive(false);
     const position = pointFromEvent(event);
+    const id = draggedCombatantId(event.dataTransfer);
+    if (id) {
+      if (positions[id]) onMove(id, position);
+      else onStage(id, position);
+      return;
+    }
     const file = event.dataTransfer.files?.[0];
     if (file) {
       onImportToStage(file, position);
       return;
     }
-    const id = event.dataTransfer.getData("application/x-combatant-id") || event.dataTransfer.getData("text/plain");
-    if (!id) return;
-    if (positions[id]) onMove(id, position);
-    else onStage(id, position);
   }
 
   useEffect(() => {
@@ -1723,6 +1731,19 @@ function firstOtherStagedId(positions, currentId) {
 
 function firstStagedIdWithout(positions, removedId, exceptId = "") {
   return Object.keys(positions).find(id => id !== removedId && id !== exceptId) || "";
+}
+
+function draggedCombatantId(dataTransfer) {
+  if (!dataTransfer) return "";
+  const explicitId = dataTransfer.getData("application/x-combatant-id");
+  if (explicitId) return explicitId;
+  const text = dataTransfer.getData("text/plain");
+  return /^slot-\d+$/i.test(text) ? text : "";
+}
+
+function isSpreadsheetFile(file) {
+  if (!file) return false;
+  return /\.xlsx$/i.test(file.name || "");
 }
 
 function readPanelLayout() {
