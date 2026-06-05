@@ -310,7 +310,110 @@ p {
 }
 
 .terminal-layout {
-  grid-template-columns: clamp(220px, 23vw, 300px) minmax(0, 1fr) clamp(280px, 28vw, 360px);
+  grid-template-columns: var(--roster-width, 300px) 8px minmax(420px, 1fr) 8px var(--ops-width, 360px);
+}
+
+.resizable-workspace {
+  user-select: none;
+}
+
+.panel-resizer {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(39, 216, 255, 0.72);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0.66;
+  -webkit-app-region: no-drag;
+}
+
+.panel-resizer::before {
+  content: "";
+  position: absolute;
+  border: 1px solid rgba(39, 216, 255, 0.18);
+  background:
+    radial-gradient(circle, rgba(39, 216, 255, 0.5) 0 1px, transparent 1px 100%),
+    linear-gradient(180deg, transparent, rgba(39, 216, 255, 0.18), transparent);
+  background-size: 6px 6px, 100% 100%;
+  box-shadow: 0 0 16px rgba(39, 216, 255, 0.08);
+}
+
+.panel-resizer.vertical {
+  width: 8px;
+  cursor: col-resize;
+}
+
+.panel-resizer.vertical::before {
+  top: 12px;
+  bottom: 12px;
+  left: 2px;
+  right: 2px;
+}
+
+.panel-resizer.horizontal {
+  height: 8px;
+  cursor: row-resize;
+}
+
+.panel-resizer.horizontal::before {
+  left: 12px;
+  right: 12px;
+  top: 2px;
+  bottom: 2px;
+  background:
+    radial-gradient(circle, rgba(39, 216, 255, 0.5) 0 1px, transparent 1px 100%),
+    linear-gradient(90deg, transparent, rgba(39, 216, 255, 0.18), transparent);
+  background-size: 6px 6px, 100% 100%;
+}
+
+.panel-resizer svg {
+  position: relative;
+  z-index: 1;
+  opacity: 0;
+  filter: drop-shadow(0 0 8px rgba(39, 216, 255, 0.55));
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.panel-resizer:hover,
+.panel-resizer:focus-visible {
+  color: var(--cyan);
+  opacity: 1;
+  background: rgba(39, 216, 255, 0.08);
+}
+
+.panel-resizer:hover svg,
+.panel-resizer:focus-visible svg {
+  opacity: 1;
+}
+
+.panel-resizer:active {
+  background: rgba(39, 216, 255, 0.16);
+  box-shadow: 0 0 24px rgba(39, 216, 255, 0.18);
+}
+
+body.resizing-panels,
+body.resizing-panels * {
+  user-select: none;
+}
+
+body.resizing-panels-col,
+body.resizing-panels-col * {
+  cursor: col-resize;
+}
+
+body.resizing-panels-row,
+body.resizing-panels-row * {
+  cursor: row-resize;
+}
+
+body.resizing-panels {
+  -webkit-user-select: none;
 }
 
 .hud-frame {
@@ -346,8 +449,8 @@ p {
 
 .ops-column {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) minmax(190px, 0.44fr) minmax(120px, 0.24fr);
-  gap: 8px;
+  grid-template-rows: var(--ops-console-height, minmax(0, 1fr)) 8px var(--ops-result-height, 190px) 8px minmax(120px, 1fr);
+  gap: 0;
 }
 
 .ops-column > .console-panel {

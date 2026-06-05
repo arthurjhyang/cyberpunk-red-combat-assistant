@@ -10,6 +10,8 @@ import {
   Edit3,
   FileSpreadsheet,
   FolderOpen,
+  GripHorizontal,
+  GripVertical,
   Maximize2,
   Minus,
   Monitor,
@@ -68,12 +70,21 @@ const initialConfig = {
   autoRollDamage: true
 };
 
+const defaultPanelLayout = {
+  rosterWidth: 300,
+  opsWidth: 360,
+  opsConsoleHeight: 300,
+  opsResultHeight: 190
+};
+
 function blankSources(cards) {
   return Object.fromEntries(Object.keys(cards).map(id => [id, null]));
 }
 
 function App() {
   const isDesktopApp = Boolean(window.electronWindow);
+  const terminalLayoutRef = useRef(null);
+  const opsColumnRef = useRef(null);
   const [cards, setCards] = useState({});
   const [sources, setSources] = useState({});
   const [battlePositions, setBattlePositions] = useState({});
@@ -85,6 +96,7 @@ function App() {
   const [dragSide, setDragSide] = useState(null);
   const [lastSnapshot, setLastSnapshot] = useState(null);
   const [activeView, setActiveView] = useState("combat");
+  const [panelLayout, setPanelLayout] = useState(() => readPanelLayout());
 
   const combatants = useMemo(() => Object.entries(cards).map(([id, card], index) => ({ id, card, index })), [cards]);
   const stagedCombatants = useMemo(
@@ -97,6 +109,83 @@ function App() {
   const selectedCard = cards[selectedCardId] || attacker || combatants[0]?.card || createBlankCard();
   const selectedSource = sources[selectedCardId] || null;
   const threat = useMemo(() => estimateThreat(cards, config), [cards, config]);
+
+  useEffect(() => {
+    window.localStorage?.setItem("cyberpunk-red-panel-layout", JSON.stringify(panelLayout));
+  }, [panelLayout]);
+
+  useEffect(() => {
+    if (activeView !== "combat") return;
+    const columnBounds = terminalLayoutRef.current?.getBoundingClientRect();
+    const opsBounds = opsColumnRef.current?.getBoundingClientRect();
+    if (!columnBounds && !opsBounds) return;
+    setPanelLayout(prev => {
+      const next = fitPanelLayout(prev, columnBounds, opsBounds);
+      return panelLayoutsEqual(prev, next) ? prev : next;
+    });
+  }, [activeView]);
+
+  function startColumnResize(side, event) {
+    const layoutNode = terminalLayoutRef.current;
+    if (!layoutNode) return;
+    event.preventDefault();
+    const bounds = layoutNode.getBoundingClientRect();
+    const startX = event.clientX;
+    const start = { ...panelLayout };
+
+    function move(pointerEvent) {
+      const delta = pointerEvent.clientX - startX;
+      setPanelLayout(prev => {
+        const next = { ...prev };
+        if (side === "left") next.rosterWidth = start.rosterWidth + delta;
+        if (side === "right") next.opsWidth = start.opsWidth - delta;
+        return fitPanelLayout(next, bounds);
+      });
+    }
+
+    function stop() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      document.body.classList.remove("resizing-panels");
+      document.body.classList.remove("resizing-panels-col");
+    }
+
+    document.body.classList.add("resizing-panels");
+    document.body.classList.add("resizing-panels-col");
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop, { once: true });
+  }
+
+  function startOpsResize(boundary, event) {
+    const opsNode = opsColumnRef.current;
+    if (!opsNode) return;
+    event.preventDefault();
+    const bounds = opsNode.getBoundingClientRect();
+    const startY = event.clientY;
+    const start = { ...panelLayout };
+
+    function move(pointerEvent) {
+      const delta = pointerEvent.clientY - startY;
+      setPanelLayout(prev => {
+        const next = { ...prev };
+        if (boundary === "console") next.opsConsoleHeight = start.opsConsoleHeight + delta;
+        if (boundary === "result") next.opsResultHeight = start.opsResultHeight + delta;
+        return fitPanelLayout(next, null, bounds);
+      });
+    }
+
+    function stop() {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      document.body.classList.remove("resizing-panels");
+      document.body.classList.remove("resizing-panels-row");
+    }
+
+    document.body.classList.add("resizing-panels");
+    document.body.classList.add("resizing-panels-row");
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop, { once: true });
+  }
 
   function patchCard(id, patch) {
     setCards(prev => {
@@ -346,7 +435,14 @@ function App() {
         />
 
         {activeView === "combat" && (
-        <section className="terminal-layout hud-frame">
+        <section
+          ref={terminalLayoutRef}
+          className="terminal-layout hud-frame resizable-workspace"
+          style={{
+            "--roster-width": `${panelLayout.rosterWidth}px`,
+            "--ops-width": `${panelLayout.opsWidth}px`
+          }}
+        >
           <RosterPanel
             combatants={combatants}
             sources={sources}
@@ -363,6 +459,12 @@ function App() {
             onRemove={removeCombatant}
             onLoadDemo={loadDemo}
             onStageQuick={id => stageCombatant(id, defaultStagePosition(Object.keys(battlePositions).length))}
+          />
+
+          <PanelResizeHandle
+            orientation="vertical"
+            label="拖动调整角色卡库宽度"
+            onPointerDown={event => startColumnResize("left", event)}
           />
 
           <section className="combat-stage">
@@ -387,7 +489,20 @@ function App() {
             />
           </section>
 
-          <aside className="ops-column">
+          <PanelResizeHandle
+            orientation="vertical"
+            label="拖动调整战斗控制台宽度"
+            onPointerDown={event => startColumnResize("right", event)}
+          />
+
+          <aside
+            ref={opsColumnRef}
+            className="ops-column resizable-ops"
+            style={{
+              "--ops-console-height": `${panelLayout.opsConsoleHeight}px`,
+              "--ops-result-height": `${panelLayout.opsResultHeight}px`
+            }}
+          >
             <CombatConsole
               combatants={combatants}
               stagedCombatants={stagedCombatants}
@@ -402,7 +517,17 @@ function App() {
               onReset={resetDemo}
               onLoadDemo={loadDemo}
             />
+            <PanelResizeHandle
+              orientation="horizontal"
+              label="拖动调整结算控制台高度"
+              onPointerDown={event => startOpsResize("console", event)}
+            />
             <ResultPanel result={result} config={config} onFillBack={fillBackResult} />
+            <PanelResizeHandle
+              orientation="horizontal"
+              label="拖动调整结算结果高度"
+              onPointerDown={event => startOpsResize("result", event)}
+            />
             <LogPanel log={log} onClear={() => setLog([])} />
           </aside>
         </section>
@@ -517,6 +642,21 @@ function TerminalNav({ activeView, onChange, combatants, autoRollDamage }) {
         <time>{now.toLocaleTimeString("zh-CN", { hour12: false })}</time>
       </div>
     </header>
+  );
+}
+
+function PanelResizeHandle({ orientation, label, onPointerDown }) {
+  const Icon = orientation === "vertical" ? GripVertical : GripHorizontal;
+  return (
+    <button
+      type="button"
+      className={`panel-resizer ${orientation}`}
+      aria-label={label}
+      title={label}
+      onPointerDown={onPointerDown}
+    >
+      <Icon size={16} />
+    </button>
   );
 }
 
@@ -1585,6 +1725,68 @@ function firstStagedIdWithout(positions, removedId, exceptId = "") {
   return Object.keys(positions).find(id => id !== removedId && id !== exceptId) || "";
 }
 
+function readPanelLayout() {
+  try {
+    const saved = window.localStorage?.getItem("cyberpunk-red-panel-layout");
+    if (!saved) return defaultPanelLayout;
+    const parsed = JSON.parse(saved);
+    return {
+      rosterWidth: clampValue(num(parsed.rosterWidth ?? defaultPanelLayout.rosterWidth), 280, 430),
+      opsWidth: clampValue(num(parsed.opsWidth ?? defaultPanelLayout.opsWidth), 300, 520),
+      opsConsoleHeight: clampValue(num(parsed.opsConsoleHeight ?? defaultPanelLayout.opsConsoleHeight), 220, 620),
+      opsResultHeight: clampValue(num(parsed.opsResultHeight ?? defaultPanelLayout.opsResultHeight), 160, 420)
+    };
+  } catch {
+    return defaultPanelLayout;
+  }
+}
+
+function fitPanelLayout(layout, columnBounds = null, opsBounds = null) {
+  const next = { ...layout };
+  const columnWidth = columnBounds?.width || 0;
+  const centerMin = 420;
+  const handleSpace = 16;
+  const rosterMin = 280;
+  const rosterMax = 430;
+  const opsMin = 300;
+  const opsMax = 520;
+
+  if (columnWidth) {
+    const maxRoster = Math.max(rosterMin, Math.min(rosterMax, columnWidth - next.opsWidth - centerMin - handleSpace));
+    next.rosterWidth = clampValue(next.rosterWidth, rosterMin, maxRoster);
+    const maxOps = Math.max(opsMin, Math.min(opsMax, columnWidth - next.rosterWidth - centerMin - handleSpace));
+    next.opsWidth = clampValue(next.opsWidth, opsMin, maxOps);
+  } else {
+    next.rosterWidth = clampValue(next.rosterWidth, rosterMin, rosterMax);
+    next.opsWidth = clampValue(next.opsWidth, opsMin, opsMax);
+  }
+
+  const opsHeight = opsBounds?.height || 0;
+  const consoleMin = 220;
+  const resultMin = 160;
+  const logMin = 120;
+  const rowHandleSpace = 16;
+
+  if (opsHeight) {
+    const maxConsole = Math.max(consoleMin, opsHeight - next.opsResultHeight - logMin - rowHandleSpace);
+    next.opsConsoleHeight = clampValue(next.opsConsoleHeight, consoleMin, maxConsole);
+    const maxResult = Math.max(resultMin, opsHeight - next.opsConsoleHeight - logMin - rowHandleSpace);
+    next.opsResultHeight = clampValue(next.opsResultHeight, resultMin, maxResult);
+  } else {
+    next.opsConsoleHeight = clampValue(next.opsConsoleHeight, consoleMin, 620);
+    next.opsResultHeight = clampValue(next.opsResultHeight, resultMin, 420);
+  }
+
+  return next;
+}
+
+function panelLayoutsEqual(a, b) {
+  return a.rosterWidth === b.rosterWidth
+    && a.opsWidth === b.opsWidth
+    && a.opsConsoleHeight === b.opsConsoleHeight
+    && a.opsResultHeight === b.opsResultHeight;
+}
+
 function nextConfigAfterStage(config, id) {
   if (!config.attacker) return { ...config, attacker: id };
   if (!config.defender && config.attacker !== id) return { ...config, defender: id };
@@ -1604,6 +1806,11 @@ function nextSlotId(cards) {
 
 function clampPercent(value) {
   return Math.max(8, Math.min(92, value));
+}
+
+function clampValue(value, min, max) {
+  const fallback = Number.isFinite(value) ? value : min;
+  return Math.max(min, Math.min(max, fallback));
 }
 
 function defaultStagePosition(index) {
