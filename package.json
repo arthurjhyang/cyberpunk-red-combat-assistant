@@ -23,11 +23,13 @@
     "@vitejs/plugin-react": "^4.3.4",
     "electron": "^42.3.2",
     "electron-builder": "^26.8.1",
+    "rcedit": "^5.0.2",
     "vite": "^5.4.21"
   },
   "build": {
     "appId": "com.cyberpunk.red.combat.assistant",
     "productName": "Cyberpunk RED Combat Assistant",
+    "afterPack": "scripts/after-pack-icon.cjs",
     "directories": {
       "output": "release"
     },
@@ -35,6 +37,12 @@
       "dist/**/*",
       "electron/**/*",
       "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/icon.ico",
+        "to": "build/icon.ico"
+      }
     ],
     "win": {
       "signAndEditExecutable": false,

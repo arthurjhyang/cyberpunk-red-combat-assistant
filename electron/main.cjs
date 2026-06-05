@@ -2,6 +2,18 @@ const { app, BrowserWindow, dialog, ipcMain } = require("electron");
 const fs = require("node:fs/promises");
 const path = require("node:path");
 
+const APP_ID = "com.cyberpunk.red.combat.assistant";
+
+if (process.platform === "win32") {
+  app.setAppUserModelId(APP_ID);
+}
+
+function iconPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "build", "icon.ico")
+    : path.join(__dirname, "..", "build", "icon.ico");
+}
+
 function createWindow() {
   const window = new BrowserWindow({
     width: 1440,
@@ -10,6 +22,7 @@ function createWindow() {
     minHeight: 560,
     title: "赛博朋克 RED 多人战斗结算台",
     frame: false,
+    icon: iconPath(),
     backgroundColor: "#07090f",
     webPreferences: {
       preload: path.join(__dirname, "preload.cjs"),
