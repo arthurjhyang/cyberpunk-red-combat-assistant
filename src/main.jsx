@@ -939,6 +939,7 @@ function TacticalBoard({
             key={id}
             type="button"
             draggable={false}
+            title={`${card.name} / HP ${card.hp}/${card.maxHp} / SP ${card.bodySp}/${card.headSp}`}
             className={`map-token ${config.attacker === id ? "as-attacker" : ""} ${config.defender === id ? "as-defender" : ""} ${draggingToken === id ? "is-dragging" : ""}`}
             style={{ left: `${point.x}%`, top: `${point.y}%` }}
             onClick={event => {
@@ -1167,6 +1168,28 @@ function CombatConsole({ combatants, stagedCombatants, config, setConfig, mode, 
         </div>
         <button type="button" className="icon-button" onClick={onSwap} title="交换攻防">
           <ArrowLeftRight size={17} />
+        </button>
+      </div>
+
+      <div className="button-row primary-actions command-actions">
+        <button type="button" onClick={onResolve}>
+          <Zap size={16} />
+          鎺烽骞剁粨绠?        </button>
+        <button type="button" className="secondary" onClick={onBaseOnly}>
+          鍙湅鍩虹鍊?        </button>
+        <button type="button" className="secondary" onClick={onFillBack}>
+          鍥炲～鍐欏崱
+        </button>
+        <button type="button" className="secondary" onClick={onUndo}>
+          鎾ゅ洖鍥炲～
+        </button>
+        <button type="button" className="secondary danger-text" onClick={onReset}>
+          <RotateCcw size={16} />
+          娓呯┖
+        </button>
+        <button type="button" className="secondary" onClick={onLoadDemo}>
+          <Users size={16} />
+          婕旂ず
         </button>
       </div>
 
@@ -1562,7 +1585,7 @@ function nextSlotId(cards) {
 }
 
 function clampPercent(value) {
-  return Math.max(6, Math.min(94, value));
+  return Math.max(8, Math.min(92, value));
 }
 
 function defaultStagePosition(index) {
