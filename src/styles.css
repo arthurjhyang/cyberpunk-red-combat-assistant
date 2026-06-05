@@ -674,8 +674,8 @@ button.window-button.close:hover {
   grid-template-columns: 28px 74px minmax(0, 1fr);
   gap: 10px;
   min-width: 0;
-  min-height: 126px;
-  padding: 8px 66px 8px 8px;
+  min-height: 150px;
+  padding: 8px 10px 8px 8px;
   border: 1px solid rgba(255, 255, 255, 0.11);
   border-radius: 0;
   background:
@@ -849,8 +849,8 @@ button.window-button.close:hover {
 
 .roster-vitals {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
-  gap: 5px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
   margin-top: 7px;
 }
 
@@ -858,7 +858,7 @@ button.window-button.close:hover {
   min-width: 0;
   display: grid;
   gap: 2px;
-  padding: 5px 6px;
+  padding: 5px 3px;
   border-left: 1px solid rgba(39, 216, 255, 0.22);
   color: var(--muted);
   background: rgba(255, 255, 255, 0.035);
@@ -868,7 +868,8 @@ button.window-button.close:hover {
 
 .roster-vitals b {
   color: var(--text);
-  font-size: 12px;
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .role-light {
@@ -929,20 +930,22 @@ button.window-button.close:hover {
 }
 
 .roster-actions {
-  position: absolute;
-  right: 9px;
-  top: auto;
-  bottom: 12px;
-  z-index: 3;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  display: flex;
+  flex-wrap: nowrap;
   gap: 4px;
-  margin: 0;
+  margin-top: 7px;
+  padding: 0;
+}
+
+.roster-card:hover .roster-actions,
+.roster-card.selected .roster-actions,
+.roster-card:focus-within .roster-actions {
+  opacity: 1;
 }
 
 .roster-actions .ghost-button {
-  width: 24px;
-  min-width: 24px;
+  width: 22px;
+  min-width: 22px;
   height: 22px;
   min-height: 22px;
   padding: 0;
@@ -980,9 +983,9 @@ button.window-button.close:hover {
 }
 
 .roster-actions .ghost-button {
-  width: 24px;
+  width: 22px;
   min-height: 22px;
-  min-width: 24px;
+  min-width: 22px;
   height: 22px;
 }
 
@@ -2247,7 +2250,6 @@ button.window-button.close:hover {
   }
 
   .header-metrics,
-  .roster-list,
   .versus-lane,
   .quick-pick,
   .vitals,
@@ -2287,7 +2289,6 @@ button.window-button.close:hover {
 
   .brand-lockup,
   .header-metrics,
-  .roster-list,
   .versus-lane,
   .quick-pick,
   .vitals,
